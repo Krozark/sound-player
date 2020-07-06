@@ -11,7 +11,7 @@ from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 
 class STATUS(Enum):
