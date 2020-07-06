@@ -46,6 +46,7 @@ class Sound(StatusObject):
         self._segment = segment
         self._tmp_file = None
         self._popen = None
+        self._loop = None
 
     def __del__(self):
         if self._popen:
@@ -55,12 +56,20 @@ class Sound(StatusObject):
         if self._tmp_file:
             self._tmp_file.close()
 
+    def set_loop(self, loop):
+        self._loop = loop
+
     def _create_tmp(self):
         self._tmp_file = NamedTemporaryFile("w+b", suffix=".wav")
         self._segment.export(self._tmp_file.name, "wav")
 
     def _create_popen(self):
-        self._popen = subprocess.Popen([self.FFPLAY_PLAYER, "-nodisp", "-autoexit", "-hide_banner", self._tmp_file.name])
+        args = [self.FFPLAY_PLAYER, "-nodisp", "-autoexit", "-hide_banner"]
+        if self._loop is not None:
+            args.append("-loop")
+            args.append(str(self._loop))
+        args.append(self._tmp_file.name)
+        self._popen = subprocess.Popen(args)
 
     def play(self):
         if self.status() == STATUS.PLAYING:
@@ -115,10 +124,10 @@ class Sound(StatusObject):
         super().stop()
 
 
-# song = AudioSegment.from_ogg("music.ogg")
-#
+# song = AudioSegment.from_ogg("data/coin.wav")
+# #
 # sound = Sound(song)
-#
+# #
 # sound.play()
 # time.sleep(5)
 #
@@ -133,17 +142,31 @@ class Sound(StatusObject):
 
 
 class Playlist(StatusObject):
-    def __init__(self, concurency=1):
+    def __init__(self, concurency=1, replace=False, loop=1):
         super().__init__()
         self._concurency = concurency
+        self._replace_on_add = replace
         self._queue_waiting = []
         self._queue_current = []
         self._thread = None
+        self._loop = None
         self._lock = threading.Lock()
+
+    def set_concurency(self, concurency):
+        self._concurency = concurency
+
+    def set_replace(self, replace):
+        self._replace_on_add = replace
+
+    def set_loop(self, loop):
+        self._loop = loop
 
     def enqueue(self, sound):
         with self._lock:
             logger.debug("enqueue %s" % sound)
+            loop = self._loop or sound._loop
+            if loop is None:
+                sound.set_loop(loop)
             self._queue_waiting.append(sound)
 
     def clear(self):
@@ -183,15 +206,23 @@ class Playlist(StatusObject):
             logger.debug("Thread loop")
             if self._status == STATUS.PLAYING:
                 with self._lock:
+                    # remove stopped sound
                     i = 0
                     while i < len(self._queue_current):
                         sound_status = self._queue_current[i].poll()
                         if sound_status == STATUS.STOPPED:
-                            logger.debug("sound %s has stoped. Remove it", sound)
+                            logger.debug("sound %s has stopped. Remove it", sound)
                             sound = self._queue_current.pop(i)
                         else:
                             i += 1
 
+                    # remove sound to make a place for new one
+                    if self._replace_on_add and self._queue_waiting and self._queue_current:
+                        for i in range(0, min(len(self._queue_current), len(self._queue_waiting))):
+                            sound = self._queue_current.pop(0)
+                            sound.stop()
+
+                    # add new if needed
                     while self._concurency > len(self._queue_current) and len(self._queue_waiting):
                         sound = self._queue_waiting.pop(0)
                         logger.debug("Add sound %s", sound)
