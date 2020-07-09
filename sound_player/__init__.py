@@ -1,17 +1,47 @@
-from pydub import AudioSegment
 import logging
-import subprocess
+import os
 import signal
-from tempfile import NamedTemporaryFile
-from pydub.utils import get_player_name
-import time
-from enum import Enum
+import subprocess
 import threading
+import time
 from collections import defaultdict
+from enum import Enum
 
 logger = logging.getLogger(__name__)
 
-__version__ = "0.1.2"
+__version__ = "0.2.0"
+
+
+def which(program):
+    """
+    Mimics behavior of UNIX which command.
+    """
+    # Add .exe program extension for windows support
+    if os.name == "nt" and not program.endswith(".exe"):
+        program += ".exe"
+
+    envdir_list = [os.curdir] + os.environ["PATH"].split(os.pathsep)
+
+    for envdir in envdir_list:
+        program_path = os.path.join(envdir, program)
+        if os.path.isfile(program_path) and os.access(program_path, os.X_OK):
+            return program_path
+
+
+def get_player_name():
+    """
+    Return enconder default application for system, either avconv or ffmpeg
+    """
+    if which("avplay"):
+        return "avplay"
+    elif which("ffplay"):
+        return "ffplay"
+    else:
+        # should raise exception
+        msg = "Couldn't find ffplay or avplay - defaulting to ffplay, but may not work"
+        logger.warning(msg)
+        # raise RuntimeWarning(msg)
+        return "ffplay"
 
 
 class STATUS(Enum):
@@ -41,10 +71,9 @@ class StatusObject(object):
 class Sound(StatusObject):
     FFPLAY_PLAYER = get_player_name()
 
-    def __init__(self, segment):
+    def __init__(self, filepath):
         super().__init__()
-        self._segment = segment
-        self._tmp_file = None
+        self._filepath = filepath
         self._popen = None
         self._loop = None
 
@@ -53,22 +82,15 @@ class Sound(StatusObject):
             self._popen.kill()
             self._popen = None
 
-        if self._tmp_file:
-            self._tmp_file.close()
-
     def set_loop(self, loop):
         self._loop = loop
-
-    def _create_tmp(self):
-        self._tmp_file = NamedTemporaryFile("w+b", suffix=".wav")
-        self._segment.export(self._tmp_file.name, "wav")
 
     def _create_popen(self):
         args = [self.FFPLAY_PLAYER, "-nodisp", "-autoexit", "-hide_banner"]
         if self._loop is not None:
             args.append("-loop")
             args.append(str(self._loop))
-        args.append(self._tmp_file.name)
+        args.append(self._filepath)
         self._popen = subprocess.Popen(args)
 
     def play(self):
@@ -76,9 +98,6 @@ class Sound(StatusObject):
             return
         elif self._status not in (STATUS.STOPPED, STATUS.PAUSED):
             raise Exception()
-
-        if self._tmp_file is None:
-            self._create_tmp()
 
         if self._popen is None:
             self._create_popen()
@@ -118,27 +137,7 @@ class Sound(StatusObject):
             self._popen.kill()
             self._popen = None
 
-        if self._tmp_file:
-            self._tmp_file.close()
-
         super().stop()
-
-
-# song = AudioSegment.from_ogg("data/coin.wav")
-# #
-# sound = Sound(song)
-# #
-# sound.play()
-# time.sleep(5)
-#
-# sound.pause()
-# time.sleep(5)
-#
-# sound.play()
-# time.sleep(5)
-#
-# sound.stop()
-# time.sleep(5)
 
 
 class Playlist(StatusObject):
@@ -233,16 +232,6 @@ class Playlist(StatusObject):
         self._thread = None
 
 
-# pl = Playlist(concurency=2)
-# pl.enqueue(Sound(AudioSegment.from_wav("coin.wav")))
-# pl.enqueue(Sound(AudioSegment.from_ogg("music.ogg")))
-# pl.enqueue(Sound(AudioSegment.from_wav("coin.wav")))
-# pl.enqueue(Sound(AudioSegment.from_wav("coin.wav")))
-#
-# pl.play()
-# time.sleep(100)
-
-
 class SoundPlayer(StatusObject):
     def __init__(self):
         super().__init__()
@@ -294,14 +283,3 @@ class SoundPlayer(StatusObject):
                 if pl.status() != STATUS.STOPPED:
                     pl.stop()
             super().stop()
-
-# player = SoundPlayer()
-# player.enqueue(Sound(AudioSegment.from_wav("coin.wav")), 1)
-# player.enqueue(Sound(AudioSegment.from_ogg("music.ogg")), 1)
-# player.enqueue(Sound(AudioSegment.from_wav("coin.wav")), 1)
-#
-# player.play()
-# time.sleep(5)
-# player.enqueue(Sound(AudioSegment.from_wav("coin.wav")), 2)
-# player.enqueue(Sound(AudioSegment.from_wav("coin.wav")), 2)
-# time.sleep(50)
