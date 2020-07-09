@@ -9,7 +9,7 @@ from enum import Enum
 
 logger = logging.getLogger(__name__)
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 
 def which(program):
@@ -215,9 +215,9 @@ class Playlist(StatusObject):
                         else:
                             i += 1
 
-                    # remove sound to make a place for new one
-                    if self._replace_on_add and self._queue_waiting and self._queue_current:
-                        for i in range(0, min(len(self._queue_current), len(self._queue_waiting))):
+                    if self._replace_on_add and len(self._queue_waiting):
+                        # remove a sound to make a place for a new one
+                        if len(self._queue_current) == self._concurency:
                             sound = self._queue_current.pop(0)
                             sound.stop()
 
