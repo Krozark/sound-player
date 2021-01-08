@@ -163,8 +163,8 @@ class Playlist(StatusObject):
     def enqueue(self, sound):
         with self._lock:
             logger.debug("enqueue %s" % sound)
-            loop = self._loop or sound._loop
-            if loop is None:
+            loop = sound._loop or self._loop
+            if loop is not None:
                 sound.set_loop(loop)
             self._queue_waiting.append(sound)
 

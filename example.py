@@ -51,8 +51,22 @@ def test_sound_player():
     player.stop()
     time.sleep(1)
 
+def test_sound_playlist_loop():
+    print("Test playlist")
+    pl = Playlist(concurency=2)
+    pl.set_loop(3)
+
+    sound = Sound("data/coin.wav")
+    sound.set_loop(5)
+    pl.enqueue(sound)
+
+    pl.play()
+    time.sleep(5)
+    pl.stop()
+    time.sleep(2)
 
 if __name__ == "__main__":
-    #test_sound()
-    #test_playlist()
+    test_sound()
+    test_playlist()
     test_sound_player()
+    test_sound_playlist_loop()
