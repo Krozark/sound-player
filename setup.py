@@ -20,6 +20,9 @@ setuptools.setup(
    url="https://github.com/Krozark/sound-player",
    keywords="sound player",
    packages=setuptools.find_packages(),
+   install_requires=[
+      'krozark-current-platform',
+   ],
    classifiers=[
       "Programming Language :: Python",
       "Programming Language :: Python :: 3",
