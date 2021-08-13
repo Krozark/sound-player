@@ -28,10 +28,10 @@ class OnCompletionListener(PythonJavaClass):
 
 class AndroidSound(BaseSound):
 
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
         self._mediaplayer = None
         self._completion_listener = None
-        super().__init__(**kwargs)
+        super().__init__(*args, **kwargs)
 
     def __del__(self):
         self._unload()
