@@ -16,6 +16,11 @@ Simple project that allow you to play multiple sound files.
 
 Take a look at example.py for usage.
 
+# instalation
+
+```
+pip install sound-player
+```
 
 # Supported os
 
