@@ -1,5 +1,3 @@
-# sound-player
-
 Simple project that allow you to play multiple sound files.
 
 # Functionality
@@ -16,7 +14,7 @@ Simple project that allow you to play multiple sound files.
 
 Take a look at example.py for usage.
 
-# install
+# Install
 
 ```
 pip install sound-player
