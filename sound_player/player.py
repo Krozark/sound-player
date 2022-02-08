@@ -78,7 +78,6 @@ class Playlist(StatusObject):
     def _thread_task(self):
         logger.debug("In playlist Thread")
         while self._status != STATUS.STOPPED:
-            logger.debug("Thread loop")
             if self._status == STATUS.PLAYING:
                 with self._lock:
                     # remove stopped sound
