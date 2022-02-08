@@ -32,6 +32,7 @@ class AndroidSound(BaseSound):
     def __init__(self, *args, **kwargs):
         self._mediaplayer = None
         self._completion_listener = None
+        self._loop_done = 0
         super().__init__(*args, **kwargs)
 
     def __del__(self):
@@ -41,6 +42,7 @@ class AndroidSound(BaseSound):
         logger.debug("AndroidSound._do_play()")
         if not self._mediaplayer:
             self._load()
+        self._loop_done = 0
         self._mediaplayer.start()
         # elif self._status == STATUS.PAUSED:
         #     self._mediaplayer.start()
@@ -59,7 +61,12 @@ class AndroidSound(BaseSound):
     def _completion_callback(self):
         logger.debug("AndroidSound._completion_callback()")
         #super().stop()
-        self._status = STATUS.STOPPED
+        self._loop_done += 1
+        if int(self._loop) > self._loop_done:
+            logger.debug("more loop to do")
+            self._mediaplayer.start()
+        else:
+            self._status = STATUS.STOPPED
 
     def _load(self):
         logger.debug("AndroidSound._load()")
@@ -81,7 +88,7 @@ class AndroidSound(BaseSound):
 
         self._mediaplayer.setDataSource(self._filepath)
         self._mediaplayer.setOnCompletionListener(self._completion_listener)
-        self._mediaplayer.setLooping(int(self._loop))
+        self._mediaplayer.setLooping(False)
         self._mediaplayer.prepare()
 
     def _unload(self):
