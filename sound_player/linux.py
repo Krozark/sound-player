@@ -18,6 +18,7 @@ class FFMpegSound(BaseSound):
             self._popen = None
 
     def _build_options(self):
+        logger.debug("FFMpegSound,_build_options()")
         player = None
         if self.which("avplay"):
             player = "avplay"
@@ -38,14 +39,17 @@ class FFMpegSound(BaseSound):
         return options
 
     def _create_popen(self):
+        logger.debug("FFMpegSound,_create_popen()")
         args = self._build_options()
         self._popen = subprocess.Popen(args)
 
     def wait(self, timeout=None):
+        logger.debug("FFMpegSound,wait(%s)", timeout)
         code = self._popen.wait(timeout=timeout)
         return code
 
     def poll(self):
+        logger.debug("FFMpegSound,poll()")
         if self._popen:
             code = self._popen.poll()
             if code is not None:
@@ -58,15 +62,18 @@ class FFMpegSound(BaseSound):
         return self._status
 
     def _do_play(self):
+        logger.debug("FFMpegSound,_do_play()")
         if self._popen is None:
             self._create_popen()
         elif self._status == STATUS.PAUSED:
             self._popen.send_signal(signal.SIGCONT)
 
     def _do_pause(self):
+        logger.debug("FFMpegSound,_do_pause()")
         self._popen.send_signal(signal.SIGSTOP)
 
     def _do_stop(self):
+        logger.debug("FFMpegSound,_do_stop()")
         if self._popen:
             self._popen.kill()
             self._popen = None

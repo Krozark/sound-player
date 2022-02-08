@@ -20,15 +20,19 @@ class Playlist(StatusObject):
         self._lock = threading.Lock()
 
     def set_concurency(self, concurency):
+        logger.debug("Playlist.set_concurency(%s)", concurency)
         self._concurency = concurency
 
     def set_replace(self, replace):
+        logger.debug("Playlist.set_replace(%s)", replace)
         self._replace_on_add = replace
 
     def set_loop(self, loop):
+        logger.debug("Playlist.set_loop(%s)", loop)
         self._loop = loop
 
     def enqueue(self, sound):
+        logger.debug("Playlist.enqueue(%s)", sound)
         with self._lock:
             logger.debug("enqueue %s" % sound)
             loop = sound._loop or self._loop
@@ -37,17 +41,20 @@ class Playlist(StatusObject):
             self._queue_waiting.append(sound)
 
     def clear(self):
+        logger.debug("Playlist.clear()")
         with self._lock:
             self._queue_waiting.clear()
             self._queue_current.clear()
 
     def pause(self):
+        logger.debug("Playlist.pause()")
         super().pause()
         with self._lock:
             for sound in self._queue_current:
                 sound.pause()
 
     def stop(self):
+        logger.debug("Playlist.stop()")
         super().stop()
         with self._lock:
             for sound in self._queue_current:
@@ -56,6 +63,7 @@ class Playlist(StatusObject):
         self.clear()
 
     def play(self):
+        logger.debug("Playlist.play()")
         super().play()
         if self._thread is None:
             logger.debug("Create playlist Thread")
@@ -106,6 +114,7 @@ class SoundPlayer(StatusObject):
         self._playlists = defaultdict(Playlist)
 
     def enqueue(self, sound, playlist):
+        logger.debug("SoundPlayer.enqueue(%s, %s)", sound, playlist)
         if not playlist in self._playlists:
             if self._status == STATUS.PLAYING:
                 self._playlists[playlist].play()
@@ -114,18 +123,22 @@ class SoundPlayer(StatusObject):
         self._playlists[playlist].enqueue(sound)
 
     def status(self, playlist=None):
+        logger.debug("SoundPlayer.status(%s)", playlist)
         if playlist is not None:
             return self._playlists[playlist].status()
         return super().status()
 
     def get_playlists(self):
+        logger.debug("SoundPlayer.get_playlists()")
         return self._playlists.keys()
 
     def delete_playlist(self, playlist):
+        logger.debug("SoundPlayer.delete_playlist(%s)", playlist)
         self._playlists[playlist].stop()
         del self._playlists[playlist]
 
     def play(self, playlist=None):
+        logger.debug("SoundPlayer.play(%s)", playlist)
         if playlist is not None:
             return self._playlists[playlist].play()
         else:
@@ -135,6 +148,7 @@ class SoundPlayer(StatusObject):
             super().play()
 
     def pause(self, playlist=None):
+        logger.debug("SoundPlayer.pause(%s)", playlist)
         if playlist is not None:
             return self._playlists[playlist].pause()
         else:
@@ -144,6 +158,7 @@ class SoundPlayer(StatusObject):
             super().pause()
 
     def stop(self, playlist=None):
+        logger.debug("SoundPlayer.stop(%s)", playlist)
         if playlist is not None:
             return self._playlists[playlist].stop()
         else:

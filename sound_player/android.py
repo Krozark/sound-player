@@ -23,6 +23,7 @@ class OnCompletionListener(PythonJavaClass):
 
     @java_method("(Landroid/media/MediaPlayer;)V")
     def onCompletion(self, mp):
+        logger.debug("OnCompletionListener.onCompletion()")
         self.callback()
 
 
@@ -37,6 +38,7 @@ class AndroidSound(BaseSound):
         self._unload()
 
     def _do_play(self):
+        logger.debug("AndroidSound._do_play()")
         if not self._mediaplayer:
             self._load()
         self._mediaplayer.start()
@@ -44,19 +46,23 @@ class AndroidSound(BaseSound):
         #     self._mediaplayer.start()
 
     def _do_pause(self):
-      self._mediaplayer.pause()
+        logger.debug("AndroidSound._do_pause()")
+        self._mediaplayer.pause()
 
     def _do_stop(self):
+        logger.debug("AndroidSound._do_stop()")
         # if not self._mediaplayer:
         #     return
         self._mediaplayer.stop()
         self._mediaplayer.prepare()
 
     def _completion_callback(self):
+        logger.debug("AndroidSound._completion_callback()")
         #super().stop()
         self._status = STATUS.STOPPED
 
     def _load(self):
+        logger.debug("AndroidSound._load()")
         self._unload()
         self._completion_listener = OnCompletionListener(
             self._completion_callback
@@ -64,11 +70,13 @@ class AndroidSound(BaseSound):
 
         self._mediaplayer = MediaPlayer()
         if api_version >= 21:
+            logger.debug("API version >= 21")
             self._mediaplayer.setAudioAttributes(
                 AudioAttributesBuilder()
                     .setLegacyStreamType(AudioManager.STREAM_MUSIC)
                     .build())
         else:
+            logger.debug("API version < 21")
             self._mediaplayer.setAudioStreamType(AudioManager.STREAM_MUSIC)
 
         self._mediaplayer.setDataSource(self._filepath)
@@ -77,6 +85,7 @@ class AndroidSound(BaseSound):
         self._mediaplayer.prepare()
 
     def _unload(self):
+        logger.debug("AndroidSound._unload()")
         if self._mediaplayer:
             self._mediaplayer.release()
             self._mediaplayer = None

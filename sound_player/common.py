@@ -18,13 +18,17 @@ class StatusObject(object):
         self._status = STATUS.STOPPED
 
     def status(self):
+        logger.debug("StatusObject,status()")
         return self._status
 
     def play(self):
+        logger.debug("StatusObject,play()")
         self._status = STATUS.PLAYING
 
     def pause(self):
+        logger.debug("StatusObject,pause()")
         self._status = STATUS.PAUSED
 
     def stop(self):
+        logger.debug("StatusObject,stop()")
         self._status = STATUS.STOPPED

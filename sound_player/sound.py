@@ -15,9 +15,11 @@ class BaseSound(StatusObject):
         self._loop = loop
 
     def set_loop(self, loop):
+        logger.debug("BaseSound.set_loop(%s)", loop)
         self._loop = loop
 
     def play(self):
+        logger.debug("BaseSound.play()")
         if self.status() == STATUS.PLAYING:
             return
         elif self._status not in (STATUS.STOPPED, STATUS.PAUSED):
@@ -27,6 +29,7 @@ class BaseSound(StatusObject):
         super().play()
 
     def pause(self):
+        logger.debug("BaseSound.pause()")
         if self.status() == STATUS.PAUSED:
             return
         elif self._status != STATUS.PLAYING:
@@ -36,6 +39,7 @@ class BaseSound(StatusObject):
         super().pause()
 
     def stop(self):
+        logger.debug("BaseSound.stop()")
         if self.status() == STATUS.STOPPED:
             return
         elif self._status not in (STATUS.PLAYING, STATUS.PAUSED):
@@ -48,12 +52,14 @@ class BaseSound(StatusObject):
         raise NotImplementedError
 
     def poll(self):
+        logger.debug("BaseSound.poll()")
         return self._status
 
     def which(self, program):
         """
         Mimics behavior of UNIX which command.
         """
+        logger.debug("BaseSound.wich(%s)", program)
         # Add .exe program extension for windows support
         if platform == "windows" and not program.endswith(".exe"):
             program += ".exe"
