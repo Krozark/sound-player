@@ -81,7 +81,7 @@ class AndroidSound(BaseSound):
 
         self._mediaplayer.setDataSource(self._filepath)
         self._mediaplayer.setOnCompletionListener(self._completion_listener)
-        self._mediaplayer.setLooping(self._loop)
+        self._mediaplayer.setLooping(int(self._loop))
         self._mediaplayer.prepare()
 
     def _unload(self):
