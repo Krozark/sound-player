@@ -61,7 +61,7 @@ class AndroidSound(BaseSound):
     def _completion_callback(self):
         logger.debug("AndroidSound._completion_callback()")
         self._loop_done += 1
-        if int(self._loop) > self._loop_done:
+        if self._loop == 0 or int(self._loop) > self._loop_done:
             logger.debug("more loop to do")
             self._mediaplayer.start()
         else:
