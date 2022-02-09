@@ -87,7 +87,6 @@ class Playlist(StatusObject):
                         if sound_status == STATUS.STOPPED:
                             logger.debug("sound %s has stopped. Remove it", sound)
                             sound = self._queue_current.pop(i)
-                            logger.debug("***************************")
                             del sound
                         else:
                             i += 1
