@@ -9,9 +9,9 @@ logger = logging.getLogger(__name__)
 
 
 class Playlist(StatusObject):
-    def __init__(self, concurency=1, replace=False, loop=1):
+    def __init__(self, concurrency=1, replace=False, loop=1):
         super().__init__()
-        self._concurency = concurency
+        self._concurrency = concurrency
         self._replace_on_add = replace
         self._queue_waiting = []
         self._queue_current = []
@@ -19,9 +19,9 @@ class Playlist(StatusObject):
         self._loop = None
         self._lock = threading.Lock()
 
-    def set_concurency(self, concurency):
-        logger.debug("Playlist.set_concurency(%s)", concurency)
-        self._concurency = concurency
+    def set_concurrency(self, concurrency):
+        logger.debug("Playlist.set_concurrency(%s)", concurrency)
+        self._concurrency = concurrency
 
     def set_replace(self, replace):
         logger.debug("Playlist.set_replace(%s)", replace)
@@ -93,12 +93,12 @@ class Playlist(StatusObject):
 
                     if self._replace_on_add and len(self._queue_waiting):
                         # remove a sound to make a place for a new one
-                        if len(self._queue_current) == self._concurency:
+                        if len(self._queue_current) == self._concurrency:
                             sound = self._queue_current.pop(0)
                             sound.stop()
 
                     # add new if needed
-                    while self._concurency > len(self._queue_current) and len(self._queue_waiting):
+                    while self._concurrency > len(self._queue_current) and len(self._queue_waiting):
                         sound = self._queue_waiting.pop(0)
                         logger.debug("Add sound %s", sound)
                         sound.play()

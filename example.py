@@ -21,7 +21,7 @@ def test_sound():
 
 def test_playlist():
     print("Test playlist")
-    pl = Playlist(concurency=2)
+    pl = Playlist(concurrency=2)
     pl.enqueue(Sound("data/coin.wav"))
     pl.enqueue(Sound("data/music.ogg"))
     pl.enqueue(Sound("data/coin.wav"))
@@ -53,7 +53,7 @@ def test_sound_player():
 
 def test_sound_playlist_loop():
     print("Test playlist")
-    pl = Playlist(concurency=2)
+    pl = Playlist(concurrency=2)
     pl.set_loop(3)
 
     sound = Sound("data/coin.wav")
