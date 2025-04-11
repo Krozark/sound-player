@@ -21,8 +21,7 @@ setuptools.setup(
    keywords="sound player",
    packages=setuptools.find_packages(),
    install_requires=[
-      'krozark-current-platform',
-       'python-vlc'
+      'python-vlc'
    ],
    classifiers=[
       "Programming Language :: Python",
