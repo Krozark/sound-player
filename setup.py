@@ -22,6 +22,7 @@ setuptools.setup(
    packages=setuptools.find_packages(),
    install_requires=[
       'krozark-current-platform',
+       'python-vlc'
    ],
    classifiers=[
       "Programming Language :: Python",

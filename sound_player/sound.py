@@ -1,9 +1,10 @@
 import logging
 import os
-
+import vlc
 from currentplatform import platform
 
-from sound_player.common import StatusObject, STATUS
+from .common import STATUS, StatusObject
+
 
 logger = logging.getLogger(__name__)
 
@@ -79,3 +80,38 @@ class BaseSound(StatusObject):
 
     def _do_stop(self):
         raise NotImplementedError
+
+class VLCSound(BaseSound):
+    def __init__(self, filepath, loop=None):
+        super().__init__(filepath, loop)
+        self._instance = vlc.Instance()
+        self._player = self._instance.media_player_new()
+        media = self._instance.media_new(self._filepath)
+        self._player.set_media(media)
+        if self._loop:
+            self._player.set_media(media)
+            media.add_option('input-repeat={}'.format(self._loop - 1))
+
+    def _do_play(self):
+        logger.debug("VLCSound._do_play()")
+        self._player.play()
+
+    def _do_pause(self):
+        logger.debug("VLCSound._do_pause()")
+        self._player.pause()
+
+    def _do_stop(self):
+        logger.debug("VLCSound._do_stop()")
+        self._player.stop()
+
+    def poll(self):
+        state = self._player.get_state()
+        if state == vlc.State.Playing:
+            return STATUS.PLAYING
+        elif state == vlc.State.Paused:
+            return STATUS.PAUSED
+        elif state in (vlc.State.Stopped, vlc.State.Ended):
+            return STATUS.STOPPED
+        return self._status
+
+Sound = VLCSound
