@@ -7,6 +7,9 @@ from .common import STATUS, StatusObject
 logger = logging.getLogger(__name__)
 
 
+
+
+
 class Playlist(StatusObject):
     def __init__(self, concurrency=1, replace=False, loop=1):
         super().__init__()
@@ -16,7 +19,7 @@ class Playlist(StatusObject):
         self._queue_waiting = []
         self._queue_current = []
         self._thread = None
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     def set_concurrency(self, concurrency):
         logger.debug("Playlist.set_concurrency(%s)", concurrency)
@@ -78,42 +81,47 @@ class Playlist(StatusObject):
 
     def _thread_task(self):
         logger.debug("In playlist Thread")
-        while self._status != STATUS.STOPPED:
-            if self._status == STATUS.PLAYING:
-                with self._lock:
-                    # remove stopped sound
-                    i = 0
-                    while i < len(self._queue_current):
-                        sound_status = self._queue_current[i].poll()
-                        if sound_status == STATUS.STOPPED:
-                            logger.debug("sound %s has stopped. Remove it", sound)
-                            sound = self._queue_current.pop(i)
-                            del sound
-                        else:
-                            i += 1
+        try:
+            while self._status != STATUS.STOPPED:
+                if self._status == STATUS.PLAYING:
+                    with self._lock:
+                        # remove stopped sound
+                        i = 0
+                        while i < len(self._queue_current):
+                            sound_status = self._queue_current[i].poll()
+                            if sound_status == STATUS.STOPPED:
+                                logger.debug("sound %s has stopped. Remove it", sound)
+                                sound = self._queue_current.pop(i)
+                                del sound
+                            else:
+                                i += 1
 
-                    if self._replace_on_add and len(self._queue_waiting):
-                        # remove a sound to make a place for a new one
-                        if len(self._queue_current) == self._concurrency:
-                            sound = self._queue_current.pop(0)
-                            sound.stop()
+                        if self._replace_on_add and len(self._queue_waiting):
+                            # remove a sound to make a place for a new one
+                            if len(self._queue_current) == self._concurrency:
+                                sound = self._queue_current.pop(0)
+                                sound.stop()
 
-                    # add new if needed
-                    while self._concurrency > len(self._queue_current) and len(self._queue_waiting):
-                        sound = self._queue_waiting.pop(0)
-                        logger.debug("Add sound %s", sound)
-                        sound.play()
-                        self._queue_current.append(sound)
+                        # add new if needed
+                        while self._concurrency > len(self._queue_current) and len(self._queue_waiting):
+                            sound = self._queue_waiting.pop(0)
+                            logger.debug("Add sound %s", sound)
+                            sound.play()
+                            self._queue_current.append(sound)
 
-            time.sleep(0.1)
-        self._thread = None
+                time.sleep(0.1)
+            self._thread = None
+            logger.debug("Exit playlist Thread")
+        except Exception as e:
+            logger.exception(f"Critical error: {e}")
+            raise
 
 
 class SoundPlayer(StatusObject):
     def __init__(self):
         super().__init__()
         self._playlists :dict[Playlist]= {}
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     def create_playlist(self, playlist, *args, **kwargs):
         with self._lock:
@@ -132,6 +140,7 @@ class SoundPlayer(StatusObject):
                 elif self._status == STATUS.PAUSED:
                     self._playlists[playlist].pause()
             self._playlists[playlist].enqueue(sound)
+
 
     def status(self, playlist=None):
         logger.debug("SoundPlayer.status(%s)", playlist)
