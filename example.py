@@ -36,6 +36,8 @@ def test_playlist():
 def test_sound_player():
     print("Test player")
     player = SoundPlayer()
+    player.create_playlist(1)
+
     # first player
     player.enqueue(Sound("data/coin.wav"), 1)
     player.enqueue(Sound("data/music.ogg"), 1)
@@ -45,6 +47,7 @@ def test_sound_player():
     time.sleep(5)
 
     # second player
+    player.create_playlist(2)
     player.enqueue(Sound("data/coin.wav"), 2)
     player.enqueue(Sound("data/coin.wav"), 2)
     time.sleep(10)
@@ -54,7 +57,7 @@ def test_sound_player():
 def test_sound_playlist_loop():
     print("Test playlist")
     pl = Playlist(concurrency=2)
-    pl.set_loop(3)
+    pl.set_loop(-1)
 
     sound = Sound("data/coin.wav")
     sound.set_loop(5)

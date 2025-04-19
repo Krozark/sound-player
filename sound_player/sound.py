@@ -9,14 +9,19 @@ logger = logging.getLogger(__name__)
 
 
 class BaseSound(StatusObject):
-    def __init__(self, filepath, loop=None):
+    def __init__(self, filepath, loop=None, volume=None):
         super().__init__()
         self._filepath = filepath
         self._loop = loop
+        self._volume = volume
 
     def set_loop(self, loop):
         logger.debug("BaseSound.set_loop(%s)", loop)
         self._loop = loop
+
+    def set_volume(self, volume:int):
+        logger.debug("BaseSound.set_volume(%s)", volume)
+        self._volume = volume
 
     def play(self):
         logger.debug("BaseSound.play()")

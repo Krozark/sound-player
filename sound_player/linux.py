@@ -31,10 +31,18 @@ class FFMpegSound(BaseSound):
             # raise RuntimeWarning(msg)
             player = "ffplay"
 
-        options = [player, "-nodisp", "-autoexit", "-hide_banner"]
+        options = [
+            player,
+            "-nodisp", "-autoexit", "-hide_banner",
+        ]
         if self._loop is not None:
             options.append("-loop")
-            options.append(str(self._loop))
+            options.append(str(self._loop +1 )) # 0 is infinit for player, but -1 in class
+
+        if self._volume is not None:
+            options.append("-volume")
+            options.append(str(self._volume))
+
         options.append(self._filepath)
         return options
 
@@ -54,9 +62,9 @@ class FFMpegSound(BaseSound):
         if self._popen:
             code = self._popen.poll()
             if code is not None:
-                if code == signal.SIGSTOP:
+                if code==signal.SIGSTOP:
                     self._status = STATUS.PAUSED
-                elif code == signal.SIGCONT:
+                elif code==signal.SIGCONT:
                     self._status = STATUS.PLAYING
                 else:  # code == signal.SIGTERM:
                     self._status = STATUS.STOPPED
@@ -66,7 +74,7 @@ class FFMpegSound(BaseSound):
         logger.debug("FFMpegSound._do_play()")
         if self._popen is None:
             self._create_popen()
-        elif self._status == STATUS.PAUSED:
+        elif self._status==STATUS.PAUSED:
             self._popen.send_signal(signal.SIGCONT)
 
     def _do_pause(self):
