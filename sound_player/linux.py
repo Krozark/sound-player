@@ -36,8 +36,12 @@ class FFMpegSound(BaseSound):
             "-nodisp", "-autoexit", "-hide_banner",
         ]
         if self._loop is not None:
-            options.append("-loop")
-            options.append(str(self._loop +1 )) # 0 is infinit for player, but -1 in class
+            if self._loop == -1:
+                options.append("-loop")
+                options.append("0") # 0 is infinit for player, but -1 in class
+            elif self._loop > 0:
+                options.append("-loop")
+                options.append(str(self._loop))
 
         if self._volume is not None:
             options.append("-volume")
@@ -59,15 +63,12 @@ class FFMpegSound(BaseSound):
 
     def poll(self):
         logger.debug("FFMpegSound.poll()")
-        if self._popen:
-            code = self._popen.poll()
-            if code is not None:
-                if code==signal.SIGSTOP:
-                    self._status = STATUS.PAUSED
-                elif code==signal.SIGCONT:
-                    self._status = STATUS.PLAYING
-                else:  # code == signal.SIGTERM:
-                    self._status = STATUS.STOPPED
+        if self._popen is None:
+            return STATUS.STOPPED
+
+        if self._popen.poll() is not None:
+            self._status = STATUS.STOPPED
+            
         return self._status
 
     def _do_play(self):
@@ -84,5 +85,5 @@ class FFMpegSound(BaseSound):
     def _do_stop(self):
         logger.debug("FFMpegSound._do_stop()")
         if self._popen:
-            self._popen.kill()
+            self._popen.terminate()
             self._popen = None

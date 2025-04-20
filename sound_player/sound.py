@@ -31,6 +31,7 @@ class BaseSound(StatusObject):
             raise Exception()
 
         self._do_play()
+        self._status = STATUS.PLAYING
         super().play()
 
     def pause(self):
@@ -41,6 +42,7 @@ class BaseSound(StatusObject):
             raise Exception()
 
         self._do_pause()
+        self._status = STATUS.PAUSED
         super().pause()
 
     def stop(self):
@@ -51,6 +53,7 @@ class BaseSound(StatusObject):
             raise Exception()
 
         self._do_stop()
+        self._status = STATUS.STOPPED
         super().stop()
 
     def wait(self, timeout=None):

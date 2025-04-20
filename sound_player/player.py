@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class Playlist(StatusObject):
-    def __init__(self, concurrency=1, replace=False, loop=1, volume=100):
+    def __init__(self, concurrency=1, replace=False, loop=None, volume=100):
         super().__init__()
         self._concurrency = concurrency
         self._replace_on_add = replace
