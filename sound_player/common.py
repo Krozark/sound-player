@@ -16,6 +16,7 @@ class StatusObject:
         self._status = STATUS.STOPPED
 
     def status(self):
+        logger.debug("StatusObject.status()")
         return self._status
 
     def play(self):

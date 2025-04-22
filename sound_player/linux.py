@@ -67,8 +67,7 @@ class FFMpegSound(BaseSound):
         return code
 
     def status(self):
-        # if self._popen is None:
-        #     return STATUS.STOPPED
+        logger.debug("FFMpegSound.status()")
 
         if self._popen and self._popen.poll() is not None:
             self.stop()
