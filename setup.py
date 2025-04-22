@@ -2,7 +2,7 @@ import os
 
 import setuptools
 
-__version__ = "0.4.9"
+__version__ = "0.4.10"
 
 
 def read(fname):
