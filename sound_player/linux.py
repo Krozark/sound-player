@@ -1,6 +1,9 @@
 import logging
+import os
 import signal
 import subprocess
+
+from currentplatform import platform
 
 from .sound import STATUS, BaseSound
 
@@ -20,9 +23,9 @@ class FFMpegSound(BaseSound):
     def _build_options(self):
         logger.debug("FFMpegSound._build_options()")
 
-        if self.which("avplay"):
+        if self._which("avplay"):
             player = "avplay"
-        elif self.which("ffplay"):
+        elif self._which("ffplay"):
             player = "ffplay"
         else:
             # should raise exception
@@ -89,6 +92,22 @@ class FFMpegSound(BaseSound):
         if self._popen:
             self._popen.terminate()
             self._popen = None
+
+    def _which(self, program):
+        """
+        Mimics behavior of UNIX which command.
+        """
+        logger.debug("BaseSound.wich(%s)", program)
+        # Add .exe program extension for windows support
+        if platform == "windows" and not program.endswith(".exe"):
+            program += ".exe"
+
+        envdir_list = [os.curdir] + os.environ["PATH"].split(os.pathsep)
+
+        for envdir in envdir_list:
+            program_path = os.path.join(envdir, program)
+            if os.path.isfile(program_path) and os.access(program_path, os.X_OK):
+                return program_path
 
 
 LinuxSound = FFMpegSound

@@ -1,7 +1,5 @@
 import logging
-import os
-
-from currentplatform import platform
+import time
 
 from sound_player.common import STATUS, StatusObject
 
@@ -54,33 +52,20 @@ class BaseSound(StatusObject):
         super().stop()
 
     def wait(self, timeout=None):
-        raise NotImplementedError
+        logger.debug("BaseSound.wait()")
+        start_timestamps = time.time()
+        while self._status != STATUS.STOPPED and (timeout is None or start_timestamps + timeout < time.time()):
+            time.sleep(0.1)
 
     def poll(self):
         logger.debug("BaseSound.poll()")
         return self._status
 
-    def which(self, program):
-        """
-        Mimics behavior of UNIX which command.
-        """
-        logger.debug("BaseSound.wich(%s)", program)
-        # Add .exe program extension for windows support
-        if platform == "windows" and not program.endswith(".exe"):
-            program += ".exe"
-
-        envdir_list = [os.curdir] + os.environ["PATH"].split(os.pathsep)
-
-        for envdir in envdir_list:
-            program_path = os.path.join(envdir, program)
-            if os.path.isfile(program_path) and os.access(program_path, os.X_OK):
-                return program_path
-
     def _do_play(self):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def _do_pause(self):
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def _do_stop(self):
-        raise NotImplementedError
+        raise NotImplementedError()

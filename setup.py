@@ -2,7 +2,7 @@ import os
 
 import setuptools
 
-from sound_player import __version__
+__version__ = "0.4.8"
 
 
 def read(fname):

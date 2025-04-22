@@ -1,6 +1,3 @@
-__version__ = "0.4.7"
-
-
 import logging
 
 from currentplatform import platform
@@ -16,4 +13,4 @@ elif platform == "android":
     from .android import AndroidSound as Sound  # noqa: F401
 else:
     logger.critical("No implementation found for platform %s", platform)
-    raise NotImplementedError
+    raise NotImplementedError()

@@ -95,22 +95,24 @@ class Playlist(StatusObject):
                         while i < len(self._queue_current):
                             sound_status = self._queue_current[i].poll()
                             if sound_status == STATUS.STOPPED:
-                                logger.debug("sound %s has stopped. Remove it", sound)
                                 sound = self._queue_current.pop(i)
+                                logger.debug("sound %s has stopped. Remove it", sound)
                                 del sound
                             else:
                                 i += 1
 
-                        if self._replace_on_add and len(self._queue_waiting):
-                            # remove a sound to make a place for a new one
-                            if len(self._queue_current) == self._concurrency:
-                                sound = self._queue_current.pop(0)
+                        # stop sounds to make place for new ones
+                        if self._replace_on_add:
+                            place_needed = len(self._queue_current) + len(self._queue_waiting) - self._concurrency
+                            for i in range(0, min(len(self._queue_current), place_needed)):
+                                sound = self._queue_current[i]
+                                logger.debug("stopping sound %s to add new one.", sound)
                                 sound.stop()
 
-                        # add new if needed
+                        # add as many new as we can
                         while self._concurrency > len(self._queue_current) and len(self._queue_waiting):
                             sound = self._queue_waiting.pop(0)
-                            logger.debug("Add sound %s", sound)
+                            logger.debug("Adding sound %s", sound)
                             sound.play()
                             self._queue_current.append(sound)
 

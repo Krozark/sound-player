@@ -30,7 +30,6 @@ class OnCompletionListener(PythonJavaClass):
 class AndroidSound(BaseSound):
     def __init__(self, *args, **kwargs):
         self._mediaplayer = None
-        self._completion_listener = None
         self._loop_done = 0
         super().__init__(*args, **kwargs)
 
@@ -57,7 +56,11 @@ class AndroidSound(BaseSound):
         self._mediaplayer.stop()
         self._mediaplayer.prepare()
 
-    def _completion_callback(self):
+    def _setup_event_handlers(self):
+        completion_listener = OnCompletionListener(self._on_end)
+        self._mediaplayer.setOnCompletionListener(completion_listener)
+
+    def _on_end(self):
         logger.debug("AndroidSound._completion_callback()")
         self._loop_done += 1
         if self._loop == -1 or int(self._loop) > self._loop_done:
@@ -69,7 +72,6 @@ class AndroidSound(BaseSound):
     def _load(self):
         logger.debug("AndroidSound._load()")
         self._unload()
-        self._completion_listener = OnCompletionListener(self._completion_callback)
 
         self._mediaplayer = MediaPlayer()
         if api_version >= 21:
@@ -82,8 +84,8 @@ class AndroidSound(BaseSound):
             self._mediaplayer.setAudioStreamType(AudioManager.STREAM_MUSIC)
 
         self._mediaplayer.setDataSource(self._filepath)
-        self._mediaplayer.setOnCompletionListener(self._completion_listener)
         self._mediaplayer.setLooping(False)
+        self._setup_event_handlers()
         self._mediaplayer.prepare()
 
     def _unload(self):
@@ -91,4 +93,3 @@ class AndroidSound(BaseSound):
         if self._mediaplayer:
             self._mediaplayer.release()
             self._mediaplayer = None
-        self._completion_listener = None

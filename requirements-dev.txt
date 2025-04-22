@@ -1,3 +1,4 @@
 # dev
 pre-commit
 pytest
+ipython
