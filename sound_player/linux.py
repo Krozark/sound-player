@@ -39,6 +39,8 @@ class FFMpegSound(BaseSound):
             "-nodisp",
             "-autoexit",
             "-hide_banner",
+            "-loglevel",
+            "error",
         ]
         if self._loop is not None:
             if self._loop == -1:
