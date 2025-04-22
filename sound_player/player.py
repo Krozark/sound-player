@@ -65,7 +65,7 @@ class Playlist(StatusObject):
     def stop(self):
         logger.debug("Playlist.stop()")
         with self._lock:
-            if self.status() != STATUS.STOPPED:
+            if self._status != STATUS.STOPPED:
                 super().stop()
                 for sound in self._queue_current:
                     sound.stop()
@@ -93,7 +93,7 @@ class Playlist(StatusObject):
                         # remove stopped sound
                         i = 0
                         while i < len(self._queue_current):
-                            sound_status = self._queue_current[i].poll()
+                            sound_status = self._queue_current[i].status()
                             if sound_status == STATUS.STOPPED:
                                 sound = self._queue_current.pop(i)
                                 logger.debug("sound %s has stopped. Remove it", sound)
@@ -127,7 +127,7 @@ class Playlist(StatusObject):
 class SoundPlayer(StatusObject):
     def __init__(self):
         super().__init__()
-        self._playlists: dict[Playlist] = {}
+        self._playlists: dict[str, Playlist] = {}
         self._lock = threading.RLock()
 
     def create_playlist(self, playlist, *args, **kwargs):

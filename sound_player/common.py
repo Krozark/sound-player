@@ -3,6 +3,7 @@ from enum import Enum
 
 logger = logging.getLogger(__name__)
 
+
 class STATUS(Enum):
     ERROR = -1
     STOPPED = 1
@@ -15,7 +16,6 @@ class StatusObject:
         self._status = STATUS.STOPPED
 
     def status(self):
-        logger.debug("StatusObject.status()")
         return self._status
 
     def play(self):

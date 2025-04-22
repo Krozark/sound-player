@@ -23,7 +23,7 @@ class BaseSound(StatusObject):
 
     def play(self):
         logger.debug("BaseSound.play()")
-        if self.status() == STATUS.PLAYING:
+        if self._status == STATUS.PLAYING:
             return
         elif self._status not in (STATUS.STOPPED, STATUS.PAUSED):
             raise Exception()
@@ -33,7 +33,7 @@ class BaseSound(StatusObject):
 
     def pause(self):
         logger.debug("BaseSound.pause()")
-        if self.status() == STATUS.PAUSED:
+        if self._status == STATUS.PAUSED:
             return
         elif self._status != STATUS.PLAYING:
             raise Exception()
@@ -43,7 +43,7 @@ class BaseSound(StatusObject):
 
     def stop(self):
         logger.debug("BaseSound.stop()")
-        if self.status() == STATUS.STOPPED:
+        if self._status == STATUS.STOPPED:
             return
         elif self._status not in (STATUS.PLAYING, STATUS.PAUSED):
             raise Exception()
@@ -56,10 +56,6 @@ class BaseSound(StatusObject):
         start_timestamps = time.time()
         while self._status != STATUS.STOPPED and (timeout is None or start_timestamps + timeout < time.time()):
             time.sleep(0.1)
-
-    def poll(self):
-        logger.debug("BaseSound.poll()")
-        return self._status
 
     def _do_play(self):
         raise NotImplementedError()

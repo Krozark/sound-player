@@ -66,15 +66,14 @@ class FFMpegSound(BaseSound):
         code = self._popen.wait(timeout=timeout)
         return code
 
-    def poll(self):
-        logger.debug("FFMpegSound.poll()")
-        if self._popen is None:
-            return STATUS.STOPPED
+    def status(self):
+        # if self._popen is None:
+        #     return STATUS.STOPPED
 
-        if self._popen.poll() is not None:
+        if self._popen and self._popen.poll() is not None:
             self.stop()
 
-        return self._status
+        return super().status()
 
     def _do_play(self):
         logger.debug("FFMpegSound._do_play()")
