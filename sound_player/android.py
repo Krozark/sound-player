@@ -1,9 +1,9 @@
 import logging
 
 from android import api_version
-from jnius import autoclass, java_method, PythonJavaClass
+from jnius import PythonJavaClass, autoclass, java_method
 
-from .sound import BaseSound, STATUS
+from .sound import BaseSound
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ class OnCompletionListener(PythonJavaClass):
     __javacontext__ = "app"
 
     def __init__(self, callback, **kwargs):
-        super(OnCompletionListener, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.callback = callback
 
     @java_method("(Landroid/media/MediaPlayer;)V")
@@ -28,7 +28,6 @@ class OnCompletionListener(PythonJavaClass):
 
 
 class AndroidSound(BaseSound):
-
     def __init__(self, *args, **kwargs):
         self._mediaplayer = None
         self._completion_listener = None
@@ -70,17 +69,14 @@ class AndroidSound(BaseSound):
     def _load(self):
         logger.debug("AndroidSound._load()")
         self._unload()
-        self._completion_listener = OnCompletionListener(
-            self._completion_callback
-        )
+        self._completion_listener = OnCompletionListener(self._completion_callback)
 
         self._mediaplayer = MediaPlayer()
         if api_version >= 21:
             logger.debug("API version >= 21")
             self._mediaplayer.setAudioAttributes(
-                AudioAttributesBuilder()
-                    .setLegacyStreamType(AudioManager.STREAM_MUSIC)
-                    .build())
+                AudioAttributesBuilder().setLegacyStreamType(AudioManager.STREAM_MUSIC).build()
+            )
         else:
             logger.debug("API version < 21")
             self._mediaplayer.setAudioStreamType(AudioManager.STREAM_MUSIC)

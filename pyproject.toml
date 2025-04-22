@@ -1,0 +1,37 @@
+[tool.ruff]
+lint.select = [
+ # pycodestyle
+ "E",
+ # Pyflakes
+ "F",
+ # pyupgrade
+ "UP",
+ # flake8-bugbear
+ "B",
+ # flake8-simplify
+ "SIM",
+ # isort
+ "I",]  # Rules to apply
+include = ["*.py"]
+exclude = ["data/*"]
+lint.ignore = [
+  "SIM108", # if/else block
+  "UP031", # format
+  "E722", # bare except
+  "SIM115", # open()
+  "SIM102", # if statement
+  "SIM110", # return all
+  "F821", # undefined name
+]
+target-version = "py312"         # Target Python version
+line-length = 120                # Line length for formatting
+lint.fixable = ["ALL"]           # Allow automatic fixes for all fixable issues
+
+[tool.ruff.lint.isort]
+case-sensitive = false
+force-single-line = false         # One import per line
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+# docstring-code-format = true

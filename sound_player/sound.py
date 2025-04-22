@@ -3,7 +3,7 @@ import os
 
 from currentplatform import platform
 
-from sound_player.common import StatusObject, STATUS
+from sound_player.common import STATUS, StatusObject
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ class BaseSound(StatusObject):
         logger.debug("BaseSound.set_loop(%s)", loop)
         self._loop = loop
 
-    def set_volume(self, volume:int):
+    def set_volume(self, volume: int):
         logger.debug("BaseSound.set_volume(%s)", volume)
         self._volume = volume
 
@@ -31,7 +31,6 @@ class BaseSound(StatusObject):
             raise Exception()
 
         self._do_play()
-        self._status = STATUS.PLAYING
         super().play()
 
     def pause(self):
@@ -42,7 +41,6 @@ class BaseSound(StatusObject):
             raise Exception()
 
         self._do_pause()
-        self._status = STATUS.PAUSED
         super().pause()
 
     def stop(self):
@@ -53,7 +51,6 @@ class BaseSound(StatusObject):
             raise Exception()
 
         self._do_stop()
-        self._status = STATUS.STOPPED
         super().stop()
 
     def wait(self, timeout=None):

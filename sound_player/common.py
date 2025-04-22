@@ -13,7 +13,7 @@ class STATUS(Enum):
     PAUSED = 3
 
 
-class StatusObject(object):
+class StatusObject:
     def __init__(self):
         self._status = STATUS.STOPPED
 

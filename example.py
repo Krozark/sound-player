@@ -1,5 +1,6 @@
 import time
-from sound_player import Sound, Playlist, SoundPlayer
+
+from sound_player import Playlist, Sound, SoundPlayer
 
 
 def test_sound():
@@ -54,6 +55,7 @@ def test_sound_player():
     player.stop()
     time.sleep(1)
 
+
 def test_sound_playlist_loop():
     print("Test playlist")
     pl = Playlist(concurrency=2)
@@ -67,6 +69,7 @@ def test_sound_playlist_loop():
     time.sleep(5)
     pl.stop()
     time.sleep(2)
+
 
 if __name__ == "__main__":
     test_sound()

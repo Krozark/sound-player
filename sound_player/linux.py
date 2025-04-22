@@ -2,7 +2,7 @@ import logging
 import signal
 import subprocess
 
-from .sound import BaseSound, STATUS
+from .sound import STATUS, BaseSound
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ class FFMpegSound(BaseSound):
 
     def _build_options(self):
         logger.debug("FFMpegSound._build_options()")
-        player = None
+
         if self.which("avplay"):
             player = "avplay"
         elif self.which("ffplay"):
@@ -33,12 +33,14 @@ class FFMpegSound(BaseSound):
 
         options = [
             player,
-            "-nodisp", "-autoexit", "-hide_banner",
+            "-nodisp",
+            "-autoexit",
+            "-hide_banner",
         ]
         if self._loop is not None:
             if self._loop == -1:
                 options.append("-loop")
-                options.append("0") # 0 is infinit for player, but -1 in class
+                options.append("0")  # 0 is infinit for player, but -1 in class
             elif self._loop > 0:
                 options.append("-loop")
                 options.append(str(self._loop))
@@ -67,15 +69,15 @@ class FFMpegSound(BaseSound):
             return STATUS.STOPPED
 
         if self._popen.poll() is not None:
-            self._status = STATUS.STOPPED
-            
+            self.stop()
+
         return self._status
 
     def _do_play(self):
         logger.debug("FFMpegSound._do_play()")
         if self._popen is None:
             self._create_popen()
-        elif self._status==STATUS.PAUSED:
+        elif self._status == STATUS.PAUSED:
             self._popen.send_signal(signal.SIGCONT)
 
     def _do_pause(self):
@@ -87,3 +89,6 @@ class FFMpegSound(BaseSound):
         if self._popen:
             self._popen.terminate()
             self._popen = None
+
+
+LinuxSound = FFMpegSound

@@ -65,7 +65,7 @@ class Playlist(StatusObject):
     def stop(self):
         logger.debug("Playlist.stop()")
         with self._lock:
-            if self.status()!=STATUS.STOPPED:
+            if self.status() != STATUS.STOPPED:
                 super().stop()
                 for sound in self._queue_current:
                     sound.stop()
@@ -87,14 +87,14 @@ class Playlist(StatusObject):
     def _thread_task(self):
         logger.debug("In playlist Thread")
         try:
-            while self._status!=STATUS.STOPPED:
-                if self._status==STATUS.PLAYING:
+            while self._status != STATUS.STOPPED:
+                if self._status == STATUS.PLAYING:
                     with self._lock:
                         # remove stopped sound
                         i = 0
                         while i < len(self._queue_current):
                             sound_status = self._queue_current[i].poll()
-                            if sound_status==STATUS.STOPPED:
+                            if sound_status == STATUS.STOPPED:
                                 logger.debug("sound %s has stopped. Remove it", sound)
                                 sound = self._queue_current.pop(i)
                                 del sound
@@ -103,7 +103,7 @@ class Playlist(StatusObject):
 
                         if self._replace_on_add and len(self._queue_waiting):
                             # remove a sound to make a place for a new one
-                            if len(self._queue_current)==self._concurrency:
+                            if len(self._queue_current) == self._concurrency:
                                 sound = self._queue_current.pop(0)
                                 sound.stop()
 
@@ -139,13 +139,12 @@ class SoundPlayer(StatusObject):
             return
 
         with self._lock:
-            if not playlist in self._playlists:
-                if self._status==STATUS.PLAYING:
+            if playlist not in self._playlists:
+                if self._status == STATUS.PLAYING:
                     self._playlists[playlist].play()
-                elif self._status==STATUS.PAUSED:
+                elif self._status == STATUS.PAUSED:
                     self._playlists[playlist].pause()
             self._playlists[playlist].enqueue(sound)
-
 
     def status(self, playlist=None):
         logger.debug("SoundPlayer.status(%s)", playlist)
@@ -170,7 +169,7 @@ class SoundPlayer(StatusObject):
                 return self._playlists[playlist].play()
             else:
                 for pl in self._playlists.values():
-                    if pl.status()!=STATUS.PLAYING:
+                    if pl.status() != STATUS.PLAYING:
                         pl.play()
                 super().play()
 
@@ -181,7 +180,7 @@ class SoundPlayer(StatusObject):
                 return self._playlists[playlist].pause()
             else:
                 for pl in self._playlists.values():
-                    if pl.status()!=STATUS.PAUSED:
+                    if pl.status() != STATUS.PAUSED:
                         pl.pause()
                 super().pause()
 
