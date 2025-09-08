@@ -29,43 +29,49 @@ class OnCompletionListener(PythonJavaClass):
 
 class AndroidSound(BaseSound):
     def __init__(self, *args, **kwargs):
-        self._mediaplayer = None
+        self._media_player = None
         self._loop_done = 0
         super().__init__(*args, **kwargs)
 
     def __del__(self):
         self._unload()
 
+    def set_volume(self, volume: int):
+        super().set_volume(volume)
+        if self._media_player:
+            volume = float(volume)
+            self._media_player.setVolume(volume, volume)
+
     def _do_play(self):
         logger.debug("AndroidSound._do_play()")
-        if not self._mediaplayer:
+        if not self._media_player:
             self._load()
         self._loop_done = 0
-        self._mediaplayer.start()
+        self._media_player.start()
         # elif self._status == STATUS.PAUSED:
-        #     self._mediaplayer.start()
+        #     self._media_player.start()
 
     def _do_pause(self):
         logger.debug("AndroidSound._do_pause()")
-        self._mediaplayer.pause()
+        self._media_player.pause()
 
     def _do_stop(self):
         logger.debug("AndroidSound._do_stop()")
-        # if not self._mediaplayer:
+        # if not self._media_player:
         #     return
-        self._mediaplayer.stop()
-        self._mediaplayer.prepare()
+        self._media_player.stop()
+        self._media_player.prepare()
 
     def _setup_event_handlers(self):
         completion_listener = OnCompletionListener(self._on_end)
-        self._mediaplayer.setOnCompletionListener(completion_listener)
+        self._media_player.setOnCompletionListener(completion_listener)
 
     def _on_end(self):
         logger.debug("AndroidSound._completion_callback()")
         self._loop_done += 1
         if self._loop == -1 or int(self._loop) > self._loop_done:
             logger.debug("more loop to do")
-            self._mediaplayer.start()
+            self._media_player.start()
         else:
             self.stop()
 
@@ -73,23 +79,25 @@ class AndroidSound(BaseSound):
         logger.debug("AndroidSound._load()")
         self._unload()
 
-        self._mediaplayer = MediaPlayer()
+        self._media_player = MediaPlayer()
         if api_version >= 21:
             logger.debug("API version >= 21")
-            self._mediaplayer.setAudioAttributes(
+            self._media_player.setAudioAttributes(
                 AudioAttributesBuilder().setLegacyStreamType(AudioManager.STREAM_MUSIC).build()
             )
         else:
             logger.debug("API version < 21")
-            self._mediaplayer.setAudioStreamType(AudioManager.STREAM_MUSIC)
+            self._media_player.setAudioStreamType(AudioManager.STREAM_MUSIC)
 
-        self._mediaplayer.setDataSource(self._filepath)
-        self._mediaplayer.setLooping(False)
+        self._media_player.setDataSource(self._filepath)
+        self._media_player.setLooping(False)
         self._setup_event_handlers()
-        self._mediaplayer.prepare()
+        self._media_player.prepare()
+
+        self.set_volume(self._volume)
 
     def _unload(self):
         logger.debug("AndroidSound._unload()")
-        if self._mediaplayer:
-            self._mediaplayer.release()
-            self._mediaplayer = None
+        if self._media_player:
+            self._media_player.release()
+            self._media_player = None

@@ -3,33 +3,34 @@ import threading
 import time
 
 from .common import STATUS, StatusObject
+from .sound import BaseSound
 
 logger = logging.getLogger(__name__)
 
 
 class Playlist(StatusObject):
-    def __init__(self, concurrency=1, replace=False, loop=None, volume=100):
+    def __init__(self, concurrency: int = 1, replace: bool = False, loop: int = 0, volume: int = 100):
         super().__init__()
-        self._concurrency = concurrency
-        self._replace_on_add = replace
-        self._loop = loop
-        self._volume = volume
-        self._queue_waiting = []
-        self._queue_current = []
+        self._concurrency: int = concurrency
+        self._replace_on_add: bool = replace
+        self._loop: int = loop
+        self._volume: int = volume
+        self._queue_waiting: list[BaseSound] = []
+        self._queue_current: list[BaseSound] = []
         self._thread = None
         self._lock = threading.RLock()
 
-    def set_concurrency(self, concurrency):
+    def set_concurrency(self, concurrency: int):
         logger.debug("Playlist.set_concurrency(%s)", concurrency)
         with self._lock:
             self._concurrency = concurrency
 
-    def set_replace(self, replace):
+    def set_replace(self, replace: bool):
         logger.debug("Playlist.set_replace(%s)", replace)
         with self._lock:
             self._replace_on_add = replace
 
-    def set_loop(self, loop):
+    def set_loop(self, loop: int):
         logger.debug("Playlist.set_loop(%s)", loop)
         with self._lock:
             self._loop = loop
@@ -39,7 +40,7 @@ class Playlist(StatusObject):
         with self._lock:
             self._volume = volume
 
-    def enqueue(self, sound):
+    def enqueue(self, sound: BaseSound):
         logger.debug("Playlist.enqueue(%s)", sound)
         with self._lock:
             logger.debug("enqueue %s" % sound)
@@ -130,71 +131,71 @@ class SoundPlayer(StatusObject):
         self._playlists: dict[str, Playlist] = {}
         self._lock = threading.RLock()
 
-    def create_playlist(self, playlist, *args, **kwargs):
+    def create_playlist(self, playlist_name: str, *args, **kwargs):
         with self._lock:
-            self._playlists[playlist] = Playlist(*args, **kwargs)
+            self._playlists[playlist_name] = Playlist(*args, **kwargs)
 
-    def enqueue(self, sound, playlist):
-        logger.debug("SoundPlayer.enqueue(%s, %s)", sound, playlist)
-        if playlist not in self._playlists:
-            logger.error(f"Playlist {playlist} not found")
+    def enqueue(self, sound, playlist_name: str):
+        logger.debug("SoundPlayer.enqueue(%s, %s)", sound, playlist_name)
+        if playlist_name not in self._playlists:
+            logger.error(f"Playlist {playlist_name} not found")
             return
 
         with self._lock:
-            if playlist not in self._playlists:
+            if playlist_name not in self._playlists:
                 if self._status == STATUS.PLAYING:
-                    self._playlists[playlist].play()
+                    self._playlists[playlist_name].play()
                 elif self._status == STATUS.PAUSED:
-                    self._playlists[playlist].pause()
-            self._playlists[playlist].enqueue(sound)
+                    self._playlists[playlist_name].pause()
+            self._playlists[playlist_name].enqueue(sound)
 
-    def status(self, playlist=None):
-        logger.debug("SoundPlayer.status(%s)", playlist)
-        if playlist is not None:
-            return self._playlists[playlist].status()
+    def status(self, playlist_name: str | None = None):
+        logger.debug("SoundPlayer.status(%s)", playlist_name)
+        if playlist_name is not None:
+            return self._playlists[playlist_name].status()
         return super().status()
 
-    def get_playlists(self):
+    def get_playlists(self) -> list[str]:
         logger.debug("SoundPlayer.get_playlists()")
         return self._playlists.keys()
 
-    def delete_playlist(self, playlist):
-        logger.debug("SoundPlayer.delete_playlist(%s)", playlist)
+    def delete_playlist(self, playlist_name: str):
+        logger.debug("SoundPlayer.delete_playlist(%s)", playlist_name)
         with self._lock:
-            self._playlists[playlist].stop()
-            del self._playlists[playlist]
+            self._playlists[playlist_name].stop()
+            del self._playlists[playlist_name]
 
-    def play(self, playlist=None):
-        logger.debug("SoundPlayer.play(%s)", playlist)
+    def play(self, playlist_name: str | None = None):
+        logger.debug("SoundPlayer.play(%s)", playlist_name)
         with self._lock:
-            if playlist is not None:
-                return self._playlists[playlist].play()
+            if playlist_name is not None:
+                return self._playlists[playlist_name].play()
             else:
                 for pl in self._playlists.values():
                     if pl.status() != STATUS.PLAYING:
                         pl.play()
                 super().play()
 
-    def pause(self, playlist=None):
-        logger.debug("SoundPlayer.pause(%s)", playlist)
+    def pause(self, playlist_name: str | None = None):
+        logger.debug("SoundPlayer.pause(%s)", playlist_name)
         with self._lock:
-            if playlist is not None:
-                return self._playlists[playlist].pause()
+            if playlist_name is not None:
+                return self._playlists[playlist_name].pause()
             else:
                 for pl in self._playlists.values():
                     if pl.status() != STATUS.PAUSED:
                         pl.pause()
                 super().pause()
 
-    def stop(self, playlist=None):
-        logger.debug("SoundPlayer.stop(%s)", playlist)
+    def stop(self, playlist_name: str | None = None):
+        logger.debug("SoundPlayer.stop(%s)", playlist_name)
         with self._lock:
-            if playlist is not None:
-                return self._playlists[playlist].stop()
+            if playlist_name is not None:
+                return self._playlists[playlist_name].stop()
             else:
                 for pl in self._playlists.values():
                     pl.stop()
                 super().stop()
 
-    def __getitem__(self, playlist):
-        return self._playlists[playlist]
+    def __getitem__(self, playlist_name: str):
+        return self._playlists[playlist_name]

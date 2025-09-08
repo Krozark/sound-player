@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 class BaseSound(StatusObject):
-    def __init__(self, filepath, loop=None, volume=None):
+    def __init__(self, filepath, loop=0, volume=None):
         super().__init__()
         self._filepath = filepath
         self._loop = loop

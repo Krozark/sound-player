@@ -1,3 +1,4 @@
+import logging
 import time
 
 from sound_player import Playlist, Sound, SoundPlayer
@@ -23,10 +24,11 @@ def test_sound():
 def test_playlist():
     print("Test playlist")
     pl = Playlist(concurrency=2)
+    pl.set_loop(2)
     pl.enqueue(Sound("data/coin.wav"))
-    pl.enqueue(Sound("data/music.ogg"))
-    pl.enqueue(Sound("data/coin.wav"))
-    pl.enqueue(Sound("data/coin.wav"))
+    # pl.enqueue(Sound("data/music.ogg"))
+    # pl.enqueue(Sound("data/coin.wav"))
+    # pl.enqueue(Sound("data/coin.wav"))
 
     pl.play()
     time.sleep(10)
@@ -72,7 +74,8 @@ def test_sound_playlist_loop():
 
 
 if __name__ == "__main__":
-    test_sound()
+    logging.basicConfig(level=logging.DEBUG)
+    # test_sound()
     test_playlist()
-    test_sound_player()
-    test_sound_playlist_loop()
+    # test_sound_player()
+    # test_sound_playlist_loop()
