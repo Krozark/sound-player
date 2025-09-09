@@ -3,7 +3,7 @@ import logging
 from android import api_version
 from jnius import PythonJavaClass, autoclass, java_method
 
-from . import BaseSound
+from .base_sound import BaseSound
 
 logger = logging.getLogger(__name__)
 

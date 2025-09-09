@@ -3,7 +3,7 @@ import time
 
 import vlc
 
-from .sound import BaseSound
+from .base_sound import BaseSound
 
 logger = logging.getLogger(__name__)
 

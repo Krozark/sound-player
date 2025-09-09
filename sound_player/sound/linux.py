@@ -5,7 +5,7 @@ import subprocess
 
 from currentplatform import platform
 
-from . import BaseSound, StatusEnum
+from .base_sound import BaseSound, StatusEnum
 
 logger = logging.getLogger(__name__)
 
