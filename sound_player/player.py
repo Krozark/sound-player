@@ -2,7 +2,7 @@ import logging
 import threading
 import time
 
-from .common import STATUS, StatusObject
+from .common import StatusEnum, StatusObject
 from .sound import BaseSound
 
 logger = logging.getLogger(__name__)
@@ -66,7 +66,7 @@ class Playlist(StatusObject):
     def stop(self):
         logger.debug("Playlist.stop()")
         with self._lock:
-            if self._status != STATUS.STOPPED:
+            if self._status != StatusEnum.STOPPED:
                 super().stop()
                 for sound in self._queue_current:
                     sound.stop()
@@ -88,14 +88,14 @@ class Playlist(StatusObject):
     def _thread_task(self):
         logger.debug("In playlist Thread")
         try:
-            while self._status != STATUS.STOPPED:
-                if self._status == STATUS.PLAYING:
+            while self._status != StatusEnum.STOPPED:
+                if self._status == StatusEnum.PLAYING:
                     with self._lock:
                         # remove stopped sound
                         i = 0
                         while i < len(self._queue_current):
                             sound_status = self._queue_current[i].status()
-                            if sound_status == STATUS.STOPPED:
+                            if sound_status == StatusEnum.STOPPED:
                                 sound = self._queue_current.pop(i)
                                 logger.debug("sound %s has stopped. Remove it", sound)
                                 del sound
@@ -142,10 +142,10 @@ class SoundPlayer(StatusObject):
             return
 
         with self._lock:
-            if playlist_name not in self._playlists:
-                if self._status == STATUS.PLAYING:
+            if playlist_name in self._playlists:
+                if self._status == StatusEnum.PLAYING:
                     self._playlists[playlist_name].play()
-                elif self._status == STATUS.PAUSED:
+                elif self._status == StatusEnum.PAUSED:
                     self._playlists[playlist_name].pause()
             self._playlists[playlist_name].enqueue(sound)
 
@@ -172,7 +172,7 @@ class SoundPlayer(StatusObject):
                 return self._playlists[playlist_name].play()
             else:
                 for pl in self._playlists.values():
-                    if pl.status() != STATUS.PLAYING:
+                    if pl.status() != StatusEnum.PLAYING:
                         pl.play()
                 super().play()
 
@@ -183,7 +183,7 @@ class SoundPlayer(StatusObject):
                 return self._playlists[playlist_name].pause()
             else:
                 for pl in self._playlists.values():
-                    if pl.status() != STATUS.PAUSED:
+                    if pl.status() != StatusEnum.PAUSED:
                         pl.pause()
                 super().pause()
 

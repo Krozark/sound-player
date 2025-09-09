@@ -5,7 +5,7 @@ import subprocess
 
 from currentplatform import platform
 
-from .sound import STATUS, BaseSound
+from . import BaseSound, StatusEnum
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ class FFMpegSound(BaseSound):
         logger.debug("FFMpegSound._do_play()")
         if self._popen is None:
             self._create_popen()
-        elif self._status == STATUS.PAUSED:
+        elif self._status == StatusEnum.PAUSED:
             self._popen.send_signal(signal.SIGCONT)
 
     def _do_pause(self):

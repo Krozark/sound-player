@@ -5,25 +5,13 @@ import signal
 import subprocess
 import tempfile
 import threading
-from enum import Enum, auto
 
 import numpy as np
 
-from .sound import STATUS, BaseSound
+from sound_player.common import AudioEffectEnum
+from sound_player.sound import BaseSound, StatusEnum
 
 logger = logging.getLogger(__name__)
-
-
-class AudioEffect(Enum):
-    """Available audio effect types"""
-
-    FADE_IN = auto()
-    FADE_OUT = auto()
-    SET_VOLUME = auto()
-    CROSSFADE = auto()
-    ECHO = auto()
-    REVERB = auto()
-
 
 # Platform detection
 try:
@@ -105,20 +93,20 @@ class AudioProcessor:
         """Execute a command"""
         effect_type = command.get("effect")
 
-        if effect_type == AudioEffect.FADE_IN:
+        if effect_type == AudioEffectEnum.FADE_IN:
             duration = command.get("duration", 1.0)
             sample_rate = command.get("sample_rate", 44100)
             self.current_volume = 0.0
             self.target_volume = command.get("target", 1.0)
             self._start_fade(duration, sample_rate)
 
-        elif effect_type == AudioEffect.FADE_OUT:
+        elif effect_type == AudioEffectEnum.FADE_OUT:
             duration = command.get("duration", 1.0)
             sample_rate = command.get("sample_rate", 44100)
             self.target_volume = 0.0
             self._start_fade(duration, sample_rate)
 
-        elif effect_type == AudioEffect.SET_VOLUME:
+        elif effect_type == AudioEffectEnum.SET_VOLUME:
             duration = command.get("duration", 0.1)
             sample_rate = command.get("sample_rate", 44100)
             self.target_volume = command.get("volume", 1.0)
@@ -154,20 +142,25 @@ class AudioProcessor:
     def fade_in(self, duration=1.0, target_volume=1.0, sample_rate=44100):
         """Trigger a fade in effect"""
         self.command_queue.put(
-            {"effect": AudioEffect.FADE_IN, "duration": duration, "target": target_volume, "sample_rate": sample_rate}
+            {
+                "effect": AudioEffectEnum.FADE_IN,
+                "duration": duration,
+                "target": target_volume,
+                "sample_rate": sample_rate,
+            }
         )
 
     def fade_out(self, duration=1.0, sample_rate=44100):
         """Trigger a fade out effect"""
-        self.command_queue.put({"effect": AudioEffect.FADE_OUT, "duration": duration, "sample_rate": sample_rate})
+        self.command_queue.put({"effect": AudioEffectEnum.FADE_OUT, "duration": duration, "sample_rate": sample_rate})
 
     def set_volume(self, volume, duration=0.1, sample_rate=44100):
         """Change volume with transition"""
         self.command_queue.put(
-            {"effect": AudioEffect.SET_VOLUME, "volume": volume, "duration": duration, "sample_rate": sample_rate}
+            {"effect": AudioEffectEnum.SET_VOLUME, "volume": volume, "duration": duration, "sample_rate": sample_rate}
         )
 
-    def apply_effect(self, effect_type: AudioEffect, **kwargs):
+    def apply_effect(self, effect_type: AudioEffectEnum, **kwargs):
         """Apply an effect with custom parameters"""
         command = {"effect": effect_type, **kwargs}
         self.command_queue.put(command)
@@ -318,21 +311,21 @@ class AndroidNativeStreamingSound(BaseSound):
         """Real-time fade in"""
         target_vol = (self._volume or 100) / 100.0
         self.processor.apply_effect(
-            AudioEffect.FADE_IN, duration=duration, target=target_vol, sample_rate=self.sample_rate
+            AudioEffectEnum.FADE_IN, duration=duration, target=target_vol, sample_rate=self.sample_rate
         )
 
     def fade_out(self, duration=1.0):
         """Real-time fade out"""
-        self.processor.apply_effect(AudioEffect.FADE_OUT, duration=duration, sample_rate=self.sample_rate)
+        self.processor.apply_effect(AudioEffectEnum.FADE_OUT, duration=duration, sample_rate=self.sample_rate)
 
     def set_volume_realtime(self, volume, duration=0.1):
         """Change volume in real-time"""
         self.processor.apply_effect(
-            AudioEffect.SET_VOLUME, volume=volume / 100.0, duration=duration, sample_rate=self.sample_rate
+            AudioEffectEnum.SET_VOLUME, volume=volume / 100.0, duration=duration, sample_rate=self.sample_rate
         )
         super().set_volume(volume)
 
-    def apply_audio_effect(self, effect_type: AudioEffect, **kwargs):
+    def apply_audio_effect(self, effect_type: AudioEffectEnum, **kwargs):
         """Apply any audio effect with custom parameters"""
         # Add sample_rate if not provided
         if "sample_rate" not in kwargs:
@@ -401,7 +394,7 @@ class AndroidNativeStreamingSound(BaseSound):
 
     def status(self):
         """Check streaming status"""
-        if self.streaming_thread and not self.streaming_thread.is_alive() and self._status != STATUS.STOPPED:
+        if self.streaming_thread and not self.streaming_thread.is_alive() and self._status != StatusEnum.STOPPED:
             self.stop()
         return super().status()
 
@@ -537,21 +530,21 @@ class LinuxStreamingSound(BaseSound):
         """Real-time fade in"""
         target_vol = (self._volume or 100) / 100.0
         self.processor.apply_effect(
-            AudioEffect.FADE_IN, duration=duration, target=target_vol, sample_rate=self.sample_rate
+            AudioEffectEnum.FADE_IN, duration=duration, target=target_vol, sample_rate=self.sample_rate
         )
 
     def fade_out(self, duration=1.0):
         """Real-time fade out"""
-        self.processor.apply_effect(AudioEffect.FADE_OUT, duration=duration, sample_rate=self.sample_rate)
+        self.processor.apply_effect(AudioEffectEnum.FADE_OUT, duration=duration, sample_rate=self.sample_rate)
 
     def set_volume_realtime(self, volume, duration=0.1):
         """Change volume in real-time"""
         self.processor.apply_effect(
-            AudioEffect.SET_VOLUME, volume=volume / 100.0, duration=duration, sample_rate=self.sample_rate
+            AudioEffectEnum.SET_VOLUME, volume=volume / 100.0, duration=duration, sample_rate=self.sample_rate
         )
         super().set_volume(volume)
 
-    def apply_audio_effect(self, effect_type: AudioEffect, **kwargs):
+    def apply_audio_effect(self, effect_type: AudioEffectEnum, **kwargs):
         """Apply any audio effect with custom parameters"""
         if "sample_rate" not in kwargs:
             kwargs["sample_rate"] = self.sample_rate
@@ -576,7 +569,7 @@ class LinuxStreamingSound(BaseSound):
                 logger.error(f"Failed to start Linux streaming: {e}")
                 self._cleanup()
                 raise
-        elif self._status == STATUS.PAUSED:
+        elif self._status == StatusEnum.PAUSED:
             # Resume from pause
             if self.player_process:
                 self.player_process.send_signal(signal.SIGCONT)
@@ -625,10 +618,10 @@ class LinuxStreamingSound(BaseSound):
     def status(self):
         """Check status of processes"""
         if self.decoder_process and self.decoder_process.poll() is not None:
-            if self._status != STATUS.STOPPED:
+            if self._status != StatusEnum.STOPPED:
                 self.stop()
         if self.player_process and self.player_process.poll() is not None:
-            if self._status != STATUS.STOPPED:
+            if self._status != StatusEnum.STOPPED:
                 self.stop()
         return super().status()
 

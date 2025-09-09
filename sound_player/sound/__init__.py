@@ -1,7 +1,7 @@
 import logging
 import time
 
-from sound_player.common import STATUS, StatusObject
+from sound_player.common import StatusEnum, StatusObject
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +23,9 @@ class BaseSound(StatusObject):
 
     def play(self):
         logger.debug("BaseSound.play()")
-        if self._status == STATUS.PLAYING:
+        if self._status == StatusEnum.PLAYING:
             return
-        elif self._status not in (STATUS.STOPPED, STATUS.PAUSED):
+        elif self._status not in (StatusEnum.STOPPED, StatusEnum.PAUSED):
             raise Exception()
 
         self._do_play()
@@ -33,9 +33,9 @@ class BaseSound(StatusObject):
 
     def pause(self):
         logger.debug("BaseSound.pause()")
-        if self._status == STATUS.PAUSED:
+        if self._status == StatusEnum.PAUSED:
             return
-        elif self._status != STATUS.PLAYING:
+        elif self._status != StatusEnum.PLAYING:
             raise Exception()
 
         self._do_pause()
@@ -43,9 +43,9 @@ class BaseSound(StatusObject):
 
     def stop(self):
         logger.debug("BaseSound.stop()")
-        if self._status == STATUS.STOPPED:
+        if self._status == StatusEnum.STOPPED:
             return
-        elif self._status not in (STATUS.PLAYING, STATUS.PAUSED):
+        elif self._status not in (StatusEnum.PLAYING, StatusEnum.PAUSED):
             raise Exception()
 
         self._do_stop()
@@ -54,7 +54,7 @@ class BaseSound(StatusObject):
     def wait(self, timeout=None):
         logger.debug("BaseSound.wait()")
         start_timestamps = time.time()
-        while self._status != STATUS.STOPPED and (timeout is None or start_timestamps + timeout < time.time()):
+        while self._status != StatusEnum.STOPPED and (timeout is None or start_timestamps + timeout < time.time()):
             time.sleep(0.1)
 
     def _do_play(self):

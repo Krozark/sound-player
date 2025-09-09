@@ -26,9 +26,9 @@ def test_playlist():
     pl = Playlist(concurrency=2)
     pl.set_loop(2)
     pl.enqueue(Sound("data/coin.wav"))
-    # pl.enqueue(Sound("data/music.ogg"))
-    # pl.enqueue(Sound("data/coin.wav"))
-    # pl.enqueue(Sound("data/coin.wav"))
+    pl.enqueue(Sound("data/music.ogg"))
+    pl.enqueue(Sound("data/coin.wav"))
+    pl.enqueue(Sound("data/coin.wav"))
 
     pl.play()
     time.sleep(10)
@@ -39,20 +39,21 @@ def test_playlist():
 def test_sound_player():
     print("Test player")
     player = SoundPlayer()
-    player.create_playlist(1)
+    player.create_playlist("1")
 
     # first player
-    player.enqueue(Sound("data/coin.wav"), 1)
-    player.enqueue(Sound("data/music.ogg"), 1)
-    player.enqueue(Sound("data/coin.wav"), 1)
+    player.enqueue(Sound("data/coin.wav"), "1")
+    player.enqueue(Sound("data/music.ogg"), "1")
+    player.enqueue(Sound("data/coin.wav"), "1")
 
     player.play()
     time.sleep(5)
 
     # second player
-    player.create_playlist(2)
-    player.enqueue(Sound("data/coin.wav"), 2)
-    player.enqueue(Sound("data/coin.wav"), 2)
+    player.create_playlist("2")
+    player.enqueue(Sound("data/coin.wav"), "2")
+    player.enqueue(Sound("data/coin.wav"), "2")
+
     time.sleep(10)
     player.stop()
     time.sleep(1)
@@ -75,7 +76,7 @@ def test_sound_playlist_loop():
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
-    # test_sound()
+    test_sound()
     test_playlist()
-    # test_sound_player()
-    # test_sound_playlist_loop()
+    test_sound_player()
+    test_sound_playlist_loop()

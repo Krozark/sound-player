@@ -3,7 +3,7 @@ import logging
 from android import api_version
 from jnius import PythonJavaClass, autoclass, java_method
 
-from .sound import BaseSound
+from . import BaseSound
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class AndroidSound(BaseSound):
             self._load()
         self._loop_done = 0
         self._media_player.start()
-        # elif self._status == STATUS.PAUSED:
+        # elif self._status == StatusEnum.PAUSED:
         #     self._media_player.start()
 
     def _do_pause(self):
