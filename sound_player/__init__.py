@@ -2,7 +2,8 @@ import logging
 
 from currentplatform import platform
 
-from .player import Playlist, SoundPlayer  # noqa: F401
+from .audiolayer import AudioLayer  # noqa: F401
+from .player import SoundPlayer  # noqa: F401
 from .sound import BaseSound  # noqa: F401
 
 logger = logging.getLogger(__name__)

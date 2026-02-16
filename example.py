@@ -1,6 +1,6 @@
 import time
 
-from sound_player import Playlist, Sound, SoundPlayer
+from sound_player import AudioLayer, Sound, SoundPlayer
 
 
 def test_sound():
@@ -21,8 +21,8 @@ def test_sound():
 
 
 def test_playlist():
-    print("Test playlist")
-    pl = Playlist(concurrency=2)
+    print("Test audio layer")
+    pl = AudioLayer(concurrency=2)
     pl.enqueue(Sound("data/coin.wav"))
     pl.enqueue(Sound("data/music.ogg"))
     pl.enqueue(Sound("data/coin.wav"))
@@ -37,7 +37,7 @@ def test_playlist():
 def test_sound_player():
     print("Test player")
     player = SoundPlayer()
-    player.create_playlist(1)
+    player.create_audio_layer(1)
 
     # first player
     player.enqueue(Sound("data/coin.wav"), 1)
@@ -48,7 +48,7 @@ def test_sound_player():
     time.sleep(5)
 
     # second player
-    player.create_playlist(2)
+    player.create_audio_layer(2)
     player.enqueue(Sound("data/coin.wav"), 2)
     player.enqueue(Sound("data/coin.wav"), 2)
     time.sleep(10)
@@ -56,9 +56,9 @@ def test_sound_player():
     time.sleep(1)
 
 
-def test_sound_playlist_loop():
-    print("Test playlist")
-    pl = Playlist(concurrency=2)
+def test_sound_audio_layer_loop():
+    print("Test audio layer loop")
+    pl = AudioLayer(concurrency=2)
     pl.set_loop(-1)
 
     sound = Sound("data/coin.wav")
@@ -75,4 +75,4 @@ if __name__ == "__main__":
     test_sound()
     test_playlist()
     test_sound_player()
-    test_sound_playlist_loop()
+    test_sound_audio_layer_loop()
