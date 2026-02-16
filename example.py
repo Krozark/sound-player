@@ -102,7 +102,7 @@ def test_sound_player_multiple_layers():
     player["music"].enqueue(Sound("data/music.ogg"))
 
     # Create a sound effects layer
-    player.create_audio_layer("sfx", concurrency=3, volume=100)
+    player.create_audio_layer("sfx", concurrency=1, volume=100)
     player["sfx"].enqueue(Sound("data/coin.wav"))
     player["sfx"].enqueue(Sound("data/coin.wav"))
 
@@ -150,7 +150,7 @@ def test_volume_controls():
 
     # Change master volume
     print("Setting master volume to 50%...")
-    player.set_master_volume(0.5)
+    player.set_volume(0.5)
     time.sleep(2)
 
     player.stop()
@@ -220,7 +220,7 @@ def main():
     # test_audio_layer_concurrency()
     # test_audio_layer_replace_mode()
     # test_sound_player_multiple_layers()
-    # test_volume_controls()
+    test_volume_controls()
     # test_loop_functionality()
     # test_audio_configuration()
 
