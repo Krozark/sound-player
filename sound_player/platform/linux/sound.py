@@ -14,6 +14,7 @@ import numpy as np
 import soundfile as sf
 
 from sound_player.core.base_sound import BaseSound
+from sound_player.core.constants import MAX_INT16, MAX_INT32
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,9 @@ class LinuxPCMSound(BaseSound):
         self._file_sample_rate = self._file_info.samplerate
         self._file_channels = self._file_info.channels
 
+        # Check if file is in float format (which has conversion issues in soundfile)
+        self._file_is_float = self._file_info.subtype in ("FLOAT", "DOUBLE", "VORBIS", "OPUS", "MP3", "FLAC")
+
         # Playback state
         self._sound_file: sf.SoundFile | None = None
         self._position = 0  # Current position in samples
@@ -58,6 +62,46 @@ class LinuxPCMSound(BaseSound):
         # Resampling buffers
         self._resample_buffer: np.ndarray | None = None
         self._resample_position = 0
+
+        # File's native dtype for reading
+        self._file_dtype = None
+
+    def _get_file_dtype(self) -> str:
+        """Get the file's native dtype for safe reading.
+
+        Returns:
+            The numpy dtype string that matches the file's format
+        """
+        if not self._file_is_float:
+            # For integer formats, we can read directly to target dtype
+            return self._config.dtype
+        # For float formats, read as float32/float64 first
+        return "float32"
+
+    def _safe_read(self, frames: int) -> np.ndarray:
+        """Read from file with proper format conversion.
+
+        For float files, reads as float32 first then converts to target dtype.
+        For integer files, reads directly to target dtype.
+
+        Args:
+            frames: Number of frames to read
+
+        Returns:
+            Audio data as numpy array
+        """
+        if self._file_is_float and self._config.dtype in ("int16", "int32"):
+            # Read as float first, then convert
+            data = self._sound_file.read(frames, dtype="float32")
+            # Convert float [-1, 1] to integer range
+            if self._config.dtype == "int16":
+                data = (data * MAX_INT16).astype(np.int16)
+            else:  # int32
+                data = (data * MAX_INT32).astype(np.int32)
+            return data
+        else:
+            # Direct read is safe
+            return self._sound_file.read(frames, dtype=self._config.dtype)
 
     def _do_play(self):
         """Start or resume playback."""
@@ -77,6 +121,13 @@ class LinuxPCMSound(BaseSound):
                     f"File format mismatch: file={self._file_sample_rate}Hz/{self._file_channels}ch, "
                     f"config={self._config.sample_rate}Hz/{self._config.channels}ch"
                 )
+
+            # Store the file's native dtype for proper reading
+            self._file_dtype = self._get_file_dtype()
+
+            # Log if file is float format
+            if self._file_is_float:
+                logger.debug(f"File is float format, will convert to {self._config.dtype}")
 
     def _do_pause(self):
         """Pause playback."""
@@ -122,8 +173,8 @@ class LinuxPCMSound(BaseSound):
         if self._sound_file is None:
             return None
 
-        # Read samples from file
-        data = self._sound_file.read(size, dtype=self._config.dtype)
+        # Read samples from file (with proper float->int conversion if needed)
+        data = self._safe_read(size)
         self._position += len(data)
 
         # Handle end of file and looping
@@ -132,7 +183,7 @@ class LinuxPCMSound(BaseSound):
                 # Seek to beginning and read remaining samples
                 self._sound_file.seek(0)
                 remaining = size - len(data)
-                extra = self._sound_file.read(remaining, dtype=self._config.dtype)
+                extra = self._safe_read(remaining)
                 if len(extra) > 0:
                     data = np.concatenate([data, extra])
                     self._position = len(extra)
@@ -162,8 +213,8 @@ class LinuxPCMSound(BaseSound):
                 ratio = self._file_sample_rate / self._config.sample_rate
                 file_samples_needed = int((size - result_pos) * ratio) + 1
 
-                # Read from file
-                data = self._sound_file.read(file_samples_needed, dtype=self._config.dtype)
+                # Read from file (with proper float->int conversion if needed)
+                data = self._safe_read(file_samples_needed)
                 self._position += len(data)
 
                 # Handle EOF
@@ -171,7 +222,7 @@ class LinuxPCMSound(BaseSound):
                     if self._check_loop():
                         self._sound_file.seek(0)
                         # Read remaining for this block
-                        extra = self._sound_file.read(file_samples_needed - len(data), dtype=self._config.dtype)
+                        extra = self._safe_read(file_samples_needed - len(data))
                         if len(extra) > 0:
                             data = np.concatenate([data, extra])
                             self._position = len(extra)

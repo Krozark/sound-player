@@ -8,6 +8,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .constants import MAX_INT16, MAX_INT32, MIN_INT16, MIN_INT32
+
 __all__ = [
     "AudioConfig",
 ]
@@ -73,16 +75,16 @@ class AudioConfig:
     def max_sample_value(self) -> int:
         """Get the maximum positive sample value for this format."""
         if self.dtype == np.int16:
-            return 32767
+            return MAX_INT16
         elif self.dtype == np.int32:
-            return 2147483647
+            return MAX_INT32
         return 0
 
     @property
     def min_sample_value(self) -> int:
         """Get the minimum negative sample value for this format."""
         if self.dtype == np.int16:
-            return -32768
+            return MIN_INT16
         elif self.dtype == np.int32:
-            return -2147483648
+            return MIN_INT32
         return 0

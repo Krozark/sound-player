@@ -5,7 +5,7 @@ import time
 
 import numpy as np
 
-from .mixins import STATUS, AudioConfigMixin, StatusMixin
+from .mixins import STATUS, AudioConfigMixin, FadeMixin, StatusMixin
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ __all__ = [
 ]
 
 
-class BaseSound(StatusMixin, AudioConfigMixin):
+class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin):
     """Base class for all sound types.
 
     Provides PCM buffer interface and platform-specific hooks for
@@ -65,6 +65,8 @@ class BaseSound(StatusMixin, AudioConfigMixin):
         like checking playback status and thread safety, then delegates
         to _do_get_next_chunk for platform-specific implementation.
 
+        Also applies fade multiplier if a fade operation is in progress.
+
         Args:
             size: Number of samples to return
 
@@ -75,7 +77,16 @@ class BaseSound(StatusMixin, AudioConfigMixin):
         with self._lock:
             if self._status in (STATUS.STOPPED, STATUS.PAUSED):
                 return None
-            return self._do_get_next_chunk(size)
+            chunk = self._do_get_next_chunk(size)
+            if chunk is not None:
+                # Apply fade multiplier
+                fade_mult = self.get_fade_multiplier()
+                if fade_mult != 1.0:
+                    chunk = (chunk.astype(np.float32) * fade_mult).astype(self.config.dtype)
+                # Auto-stop if crossfade out completed
+                if self._fade_state.name == "NONE" and fade_mult <= 0.001:
+                    self._status = STATUS.STOPPED
+            return chunk
 
     def _do_get_next_chunk(self, size: int) -> np.ndarray | None:
         """Get the next chunk of audio data.

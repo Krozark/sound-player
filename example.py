@@ -6,13 +6,15 @@ This example demonstrates:
 3. SoundPlayer with multiple audio layers
 4. Volume controls at sound, layer, and master levels
 5. Loop functionality
+6. Fade-in/fade-out and crossfade effects
 """
 
 import argparse
 import logging
 import time
 
-from sound_player import AudioConfig, Sound, SoundPlayer
+from sound_player import Sound, SoundPlayer
+from sound_player.core import AudioConfig, FadeCurve
 
 
 def setup_logging(verbosity: int = 0):
@@ -56,6 +58,39 @@ def test_basic_sound():
 
     print("Resuming sound...")
     player.play()
+    time.sleep(3)
+
+    print("Stopping sound...")
+    player.stop()
+    time.sleep(1)
+
+
+def test_change_sound_volume():
+    """Test basic sound playback with play/pause/stop controls."""
+    print("=" * 50)
+    print("Test 1: Basic Sound Playback")
+    print("=" * 50)
+
+    player = SoundPlayer()
+    player.create_audio_layer("main", concurrency=1)
+
+    sound = Sound("data/music.ogg")
+    player["main"].enqueue(sound)
+
+    print("Playing sound...")
+    player.play()
+    time.sleep(3)
+
+    print("setting volume to 50%...")
+    sound.set_volume(0.5)
+    time.sleep(3)
+
+    print("setting volume to 20%...")
+    sound.set_volume(0.2)
+    time.sleep(3)
+
+    print("setting volume to 100%...")
+    sound.set_volume(1.0)
     time.sleep(3)
 
     print("Stopping sound...")
@@ -243,6 +278,94 @@ def test_audio_configuration():
     time.sleep(1)
 
 
+def test_manual_fade():
+    """Test manual fade-in/fade-out effects with different curves."""
+    print("\n" + "=" * 50)
+    print("Test 8: Manual Fade Effects")
+    print("=" * 50)
+
+    player = SoundPlayer()
+    player.create_audio_layer("music", concurrency=1)
+
+    # Create a single sound that we'll reuse
+    music = Sound("data/music.ogg")
+    player["music"].enqueue(music)
+
+    # Test fade-in with linear curve
+    print("Testing fade-in with LINEAR curve...")
+    music.set_fade_curve(FadeCurve.LINEAR)
+    music.fade_in(duration=2.0, target_volume=0.7)
+    player.play()
+    time.sleep(5)
+
+    # Test fade-in with exponential curve
+    print("\nTesting fade-in with EXPONENTIAL curve...")
+    player.pause()
+    music.set_fade_curve(FadeCurve.EXPONENTIAL)
+    music.fade_in(duration=2.0, target_volume=0.7)
+    player.play()
+    time.sleep(5)
+
+    # Test fade-in with s-curve
+    print("\nTesting fade-in with S-CURVE...")
+    player.pause()
+    music.set_fade_curve(FadeCurve.SCURVE)
+    music.fade_in(duration=2.0, target_volume=0.7)
+    player.play()
+    time.sleep(5)
+
+    # Test fade-out
+    print("\nTesting fade-out...")
+    music.fade_out(duration=3.0, target_volume=0.0)
+    time.sleep(5)
+
+    player.stop()
+    time.sleep(1)
+
+
+def test_crossfade():
+    """Test crossfade between ambient sounds."""
+    print("\n" + "=" * 50)
+    print("Test 9: Crossfade Between Ambience Sounds")
+    print("=" * 50)
+
+    player = SoundPlayer()
+
+    # Create an ambience layer with crossfade enabled
+    # When a new sound is enqueued, the old one fades out while the new one fades in
+    player.create_audio_layer(
+        "ambience",
+        concurrency=1,
+        replace=True,
+        crossfade_duration=4.0,  # 4-second crossfade
+        volume=0.8,
+    )
+
+    print("Playing night ambience...")
+    night = Sound("data/night-ambience.wav")
+    player["ambience"].enqueue(night)
+    player.play()
+    time.sleep(6)
+
+    print("Crossfading to dark ship ambience (4 seconds)...")
+    print("(The night sound fades out while the ship sound fades in)")
+    dark_ship = Sound("data/dark-ship.wav")
+    player["ambience"].enqueue(dark_ship)
+    time.sleep(10)
+
+    print("Crossfading back to night ambience (4 seconds)...")
+    night2 = Sound("data/night-ambience.wav")
+    player["ambience"].enqueue(night2)
+    time.sleep(10)
+
+    print("Fading out over 3 seconds...")
+    night2.fade_out(duration=3.0)
+    time.sleep(4)
+
+    player.stop()
+    time.sleep(1)
+
+
 def main(verbosity: int = 0):
     """Run all examples.
 
@@ -254,13 +377,16 @@ def main(verbosity: int = 0):
     print("SOUND PLAYER LIBRARY - EXAMPLES")
     print("=" * 50)
 
-    test_basic_sound()
-    test_audio_layer_concurrency()
-    test_audio_layer_replace_mode()
-    test_sound_player_multiple_layers()
-    test_volume_controls()
-    test_loop_functionality()
-    test_audio_configuration()
+    # test_basic_sound()
+    # test_change_sound_volume()
+    # test_audio_layer_concurrency()
+    # test_audio_layer_replace_mode()
+    # test_sound_player_multiple_layers()
+    # test_volume_controls()
+    # test_loop_functionality()
+    # test_audio_configuration()
+    # test_manual_fade()
+    test_crossfade()
 
     print("\n" + "=" * 50)
     print("All examples completed!")

@@ -1,23 +1,11 @@
-"""Mixin classes for the sound-player library.
-
-This module provides reusable mixins for managing status and volume.
-"""
+"""Status mixin for managing playback state."""
 
 import logging
-import threading
 from enum import Enum
 
-from .audio_config import AudioConfig
+from .volume import VolumeMixin
 
 logger = logging.getLogger(__name__)
-
-__all__ = [
-    "STATUS",
-    "StatusMixin",
-    "VolumeMixin",
-    "AudioConfigMixin",
-    "LockMixin",
-]
 
 
 class STATUS(Enum):
@@ -29,67 +17,21 @@ class STATUS(Enum):
     PAUSED = 3
 
 
-class LockMixin:
-    def __init__(self, *args, **kwargs):
-        """Initialize the volume and lock.
-
-        Args:
-            volume: Initial volume (0.0-1.0), defaults to 1.0.
-        """
-        super().__init__(*args, **kwargs)
-        self._lock = threading.RLock()
-
-
-class VolumeMixin(LockMixin):
-    """Mixin class for managing volume with clamping.
-
-    Provides _volume attribute, _lock, and set_volume/get_volume methods that
-    clamp values to the 0.0-1.0 range.
-    """
-
-    def __init__(self, volume: float = 1.0, *args, **kwargs):
-        """Initialize the volume and lock.
-
-        Args:
-            volume: Initial volume (0.0-1.0), defaults to 1.0.
-        """
-        super().__init__(*args, **kwargs)
-
-        self.set_volume(volume)
-
-    def set_volume(self, volume: float) -> None:
-        """Set the volume with clamping.
-
-        Args:
-            volume: Volume level (0.0-1.0), will be clamped to this range.
-        """
-        if volume is None:
-            volume = 1.0
-
-        with self._lock:
-            self._volume = max(0.0, min(1.0, volume))
-
-    @property
-    def volume(self) -> float:
-        """Get the master volume."""
-        return self._volume
-
-
 class StatusMixin(VolumeMixin):
     """Mixin class for managing playback status with volume and thread safety.
 
-    Provides status management (_status), volume management (inherited),
-    and thread-safe play/pause/stop methods with hooks for subclasses.
+    Provides status management (_status), volume management (inherited from
+    VolumeMixin), and thread-safe play/pause/stop methods with hooks for
+    subclasses.
     """
 
     def __init__(self, *args, **kwargs):
-        """Initialize the status and volume.
+        """Initialize the status.
 
         Args:
             volume: Initial volume (0.0-1.0), defaults to 1.0.
         """
         self._status = STATUS.STOPPED
-
         super().__init__(*args, **kwargs)
 
     def status(self) -> STATUS:
@@ -164,15 +106,3 @@ class StatusMixin(VolumeMixin):
         Called with the lock held.
         """
         raise NotImplementedError()
-
-
-class AudioConfigMixin:
-    def __init__(self, config: AudioConfig | None = None, *args, **kwargs):
-        self._config = config or AudioConfig()
-
-        super().__init__(*args, **kwargs)
-
-    @property
-    def config(self) -> AudioConfig:
-        """Get the audio configuration."""
-        return self._config
