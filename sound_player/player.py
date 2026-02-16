@@ -41,6 +41,14 @@ class SoundPlayer(StatusObject):
         logger.debug("SoundPlayer.get_audio_layers()")
         return self._audio_layers.keys()
 
+    def clear(self, layer=None):
+        logger.debug("SoundPlayer.clear(%s)", layer)
+        if layer is not None:
+            self._audio_layers[layer].clear()
+        else:
+            for audio_layer in self._audio_layers.values():
+                audio_layer.clear()
+
     def delete_audio_layer(self, layer):
         logger.debug("SoundPlayer.delete_audio_layer(%s)", layer)
         with self._lock:

@@ -148,6 +148,57 @@ class TestSoundPlayerGetAudioLayers:
         assert set(player.get_audio_layers()) == set()
 
 
+class TestSoundPlayerClear:
+    """Tests for clear method."""
+
+    def test_clear_specific_layer(self, mock_sound):
+        """Test clearing a specific audio layer."""
+        player = SoundPlayer()
+        player.create_audio_layer("layer1")
+        player.create_audio_layer("layer2")
+
+        sound = mock_sound()
+        player._audio_layers["layer1"].enqueue(sound)
+        player._audio_layers["layer2"].enqueue(sound)
+
+        player.clear("layer1")
+
+        # Only layer1 should be cleared
+        assert len(player._audio_layers["layer1"]._queue_waiting) == 0
+        assert len(player._audio_layers["layer2"]._queue_waiting) == 1
+
+    def test_clear_all_layers(self, mock_sound):
+        """Test clearing all audio layers."""
+        player = SoundPlayer()
+        player.create_audio_layer("layer1")
+        player.create_audio_layer("layer2")
+        player.create_audio_layer("layer3")
+
+        sound = mock_sound()
+        player._audio_layers["layer1"].enqueue(sound)
+        player._audio_layers["layer2"].enqueue(sound)
+        player._audio_layers["layer3"].enqueue(sound)
+
+        player.clear()
+
+        # All layers should be cleared
+        assert len(player._audio_layers["layer1"]._queue_waiting) == 0
+        assert len(player._audio_layers["layer2"]._queue_waiting) == 0
+        assert len(player._audio_layers["layer3"]._queue_waiting) == 0
+
+    def test_clear_clears_current_queue(self, mock_sound):
+        """Test that clear also clears the current queue."""
+        player = SoundPlayer()
+        player.create_audio_layer("layer1")
+
+        sound = mock_sound()
+        player._audio_layers["layer1"]._queue_current.append(sound)
+
+        player.clear("layer1")
+
+        assert len(player._audio_layers["layer1"]._queue_current) == 0
+
+
 class TestSoundPlayerDeleteAudioLayer:
     """Tests for delete_audio_layer method."""
 
