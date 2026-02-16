@@ -15,7 +15,7 @@ __all__ = [
 
 
 if platform == "linux":
-    from .linux import Sound
+    from .linux import LinuxPCMSound as Sound
 elif platform == "android":
     from .android import Sound
 else:

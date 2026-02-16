@@ -14,13 +14,15 @@ import threading
 import numpy as np
 import soundfile as sf
 
-from ...audio_config import AudioConfig
-from ...common import STATUS
-from ...sound import BaseSound
+from sound_player.audio_config import AudioConfig
+from sound_player.common import STATUS
+from sound_player.sound import BaseSound
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["LinuxPCMSound"]
+__all__ = [
+    "LinuxPCMSound",
+]
 
 
 class LinuxPCMSound(BaseSound):
