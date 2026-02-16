@@ -13,8 +13,14 @@ class SoundPlayer(StatusObject):
         self._audio_layers: dict[str, AudioLayer] = {}
         self._lock = threading.RLock()
 
-    def create_audio_layer(self, layer, *args, **kwargs):
+    def create_audio_layer(self, layer, force=False, *args, **kwargs):
+        logger.debug("SoundPlayer.create_audio_layer(%s)", layer)
         with self._lock:
+            if layer in self._audio_layers:
+                if not force:
+                    logger.warning(f"AudioLayer {layer} already exists")
+                    return
+                logger.debug(f"AudioLayer {layer} exists, overwriting due to force=True")
             self._audio_layers[layer] = AudioLayer(*args, **kwargs)
 
     def enqueue(self, sound, layer):

@@ -41,12 +41,30 @@ class TestSoundPlayerCreateAudioLayer:
         player.create_audio_layer("layer3")
         assert len(player._audio_layers) == 3
 
-    def test_create_overwrites_existing_layer(self):
-        """Test that creating a layer with existing ID overwrites it."""
+    def test_create_duplicate_layer_does_not_overwrite(self):
+        """Test that creating a layer with existing ID does not overwrite it."""
         player = SoundPlayer()
         player.create_audio_layer("layer1", concurrency=2)
         player.create_audio_layer("layer1", concurrency=5)
+        # Should keep the original layer with concurrency=2
+        assert player._audio_layers["layer1"]._concurrency == 2
+
+    def test_create_duplicate_layer_with_force_overwrites(self):
+        """Test that creating a layer with force=True overwrites existing layer."""
+        player = SoundPlayer()
+        player.create_audio_layer("layer1", concurrency=2)
+        player.create_audio_layer("layer1", force=True, concurrency=5)
+        # Should overwrite with the new layer having concurrency=5
         assert player._audio_layers["layer1"]._concurrency == 5
+
+    def test_create_layer_with_force_false_does_not_overwrite(self):
+        """Test that force=False explicitly preserves existing layer."""
+        player = SoundPlayer()
+        player.create_audio_layer("layer1", concurrency=2, replace=True)
+        player.create_audio_layer("layer1", force=False, concurrency=5, replace=False)
+        # Should keep the original layer's settings
+        assert player._audio_layers["layer1"]._concurrency == 2
+        assert player._audio_layers["layer1"]._replace_on_add is True
 
 
 class TestSoundPlayerEnqueue:
