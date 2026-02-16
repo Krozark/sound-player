@@ -6,14 +6,12 @@ of multiple audio streams with support for volume control at multiple levels.
 
 import logging
 import threading
-from typing import TYPE_CHECKING
 
 import numpy as np
 
 from .core.audio_config import AudioConfig
-
-if TYPE_CHECKING:
-    from .core.base_sound import BaseSound
+from .core.base_sound import BaseSound
+from .core.state import STATUS
 
 logger = logging.getLogger(__name__)
 
@@ -105,8 +103,6 @@ class AudioMixer:
         Returns:
             List of sounds that are in PLAYING status
         """
-        from .core.state import STATUS
-
         with self._lock:
             return [s for s in self._sounds if s.status() == STATUS.PLAYING]
 

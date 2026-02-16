@@ -9,8 +9,8 @@ from sound_player.core.state import STATUS
 class MockSound(BaseSound):
     """Mock implementation of BaseSound for testing."""
 
-    def __init__(self, filepath, loop=None, volume=None):
-        super().__init__(filepath, loop, volume)
+    def __init__(self, filepath, config=None, loop=None, volume=None):
+        super().__init__(filepath, config, loop, volume)
         self.do_play_called = False
         self.do_pause_called = False
         self.do_stop_called = False

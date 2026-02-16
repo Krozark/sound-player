@@ -3,31 +3,31 @@
 import pytest
 
 from sound_player.core.state import STATUS
-from sound_player.player import SoundPlayer
+from sound_player.platform.linux.player import LinuxSoundPlayer
 
 
-class TestSoundPlayerInit:
-    """Tests for SoundPlayer initialization."""
+class TestBaseSoundPlayerInit:
+    """Tests for BaseSoundPlayer initialization."""
 
     def test_initialization(self):
-        """Test SoundPlayer initializes correctly."""
-        player = SoundPlayer()
+        """Test BaseSoundPlayer initializes correctly."""
+        player = LinuxSoundPlayer()
         assert player._audio_layers == {}
         assert player.status() == STATUS.STOPPED
 
 
-class TestSoundPlayerCreateAudioLayer:
+class TestBaseSoundPlayerCreateAudioLayer:
     """Tests for create_audio_layer method."""
 
     def test_create_audio_layer_default_params(self):
         """Test creating audio layer with default parameters."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
         assert "layer1" in player._audio_layers
 
     def test_create_audio_layer_with_params(self):
         """Test creating audio layer with custom parameters."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1", concurrency=3, replace=True)
         layer = player._audio_layers["layer1"]
         assert layer._concurrency == 3
@@ -35,7 +35,7 @@ class TestSoundPlayerCreateAudioLayer:
 
     def test_create_multiple_audio_layers(self):
         """Test creating multiple audio layers."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
         player.create_audio_layer("layer2")
         player.create_audio_layer("layer3")
@@ -43,7 +43,7 @@ class TestSoundPlayerCreateAudioLayer:
 
     def test_create_duplicate_layer_does_not_overwrite(self):
         """Test that creating a layer with existing ID does not overwrite it."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1", concurrency=2)
         player.create_audio_layer("layer1", concurrency=5)
         # Should keep the original layer with concurrency=2
@@ -51,7 +51,7 @@ class TestSoundPlayerCreateAudioLayer:
 
     def test_create_duplicate_layer_with_force_overwrites(self):
         """Test that creating a layer with force=True overwrites existing layer."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1", concurrency=2)
         player.create_audio_layer("layer1", force=True, concurrency=5)
         # Should overwrite with the new layer having concurrency=5
@@ -59,7 +59,7 @@ class TestSoundPlayerCreateAudioLayer:
 
     def test_create_layer_with_force_false_does_not_overwrite(self):
         """Test that force=False explicitly preserves existing layer."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1", concurrency=2, replace=True)
         player.create_audio_layer("layer1", force=False, concurrency=5, replace=False)
         # Should keep the original layer's settings
@@ -67,12 +67,12 @@ class TestSoundPlayerCreateAudioLayer:
         assert player._audio_layers["layer1"]._replace_on_add is True
 
 
-class TestSoundPlayerEnqueue:
+class TestBaseSoundPlayerEnqueue:
     """Tests for enqueue method."""
 
     def test_enqueue_to_existing_layer(self, mock_sound):
         """Test enqueuing sound to existing layer."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
         sound = mock_sound()
 
@@ -83,7 +83,7 @@ class TestSoundPlayerEnqueue:
 
     def test_enqueue_to_nonexistent_layer(self, mock_sound, caplog):
         """Test enqueuing to non-existent layer logs error."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         sound = mock_sound()
 
         player.enqueue(sound, "nonexistent")
@@ -93,7 +93,7 @@ class TestSoundPlayerEnqueue:
 
     def test_enqueue_starts_layer_if_player_playing(self, mock_sound):
         """Test that enqueue starts layer if player is playing."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
         sound = mock_sound()
 
@@ -108,7 +108,7 @@ class TestSoundPlayerEnqueue:
 
     def test_enqueue_pauses_layer_if_player_paused(self, mock_sound):
         """Test that enqueue pauses layer if player is paused."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
         sound = mock_sound()
 
@@ -123,17 +123,17 @@ class TestSoundPlayerEnqueue:
         player.stop()
 
 
-class TestSoundPlayerStatus:
+class TestBaseSoundPlayerStatus:
     """Tests for status method."""
 
     def test_status_no_argument_returns_player_status(self):
         """Test status() with no argument returns player status."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         assert player.status() == STATUS.STOPPED
 
     def test_status_with_layer_id_returns_layer_status(self):
         """Test status(layer_id) returns specific layer status."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
 
         # Layer should be stopped initially
@@ -147,12 +147,12 @@ class TestSoundPlayerStatus:
         player.stop()
 
 
-class TestSoundPlayerGetAudioLayers:
+class TestBaseSoundPlayerGetAudioLayers:
     """Tests for get_audio_layers method."""
 
     def test_get_audio_layers_returns_keys(self):
         """Test get_audio_layers returns layer IDs."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
         player.create_audio_layer("layer2")
         player.create_audio_layer("layer3")
@@ -162,16 +162,16 @@ class TestSoundPlayerGetAudioLayers:
 
     def test_get_audio_layers_empty_player(self):
         """Test get_audio_layers returns empty set when no layers."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         assert set(player.get_audio_layers()) == set()
 
 
-class TestSoundPlayerClear:
+class TestBaseSoundPlayerClear:
     """Tests for clear method."""
 
     def test_clear_specific_layer(self, mock_sound):
         """Test clearing a specific audio layer."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
         player.create_audio_layer("layer2")
 
@@ -187,7 +187,7 @@ class TestSoundPlayerClear:
 
     def test_clear_all_layers(self, mock_sound):
         """Test clearing all audio layers."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
         player.create_audio_layer("layer2")
         player.create_audio_layer("layer3")
@@ -206,7 +206,7 @@ class TestSoundPlayerClear:
 
     def test_clear_clears_current_queue(self, mock_sound):
         """Test that clear also clears the current queue."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
 
         sound = mock_sound()
@@ -217,12 +217,12 @@ class TestSoundPlayerClear:
         assert len(player._audio_layers["layer1"]._queue_current) == 0
 
 
-class TestSoundPlayerDeleteAudioLayer:
+class TestBaseSoundPlayerDeleteAudioLayer:
     """Tests for delete_audio_layer method."""
 
     def test_delete_audio_layer(self):
         """Test deleting an audio layer."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
         assert "layer1" in player._audio_layers
 
@@ -231,7 +231,7 @@ class TestSoundPlayerDeleteAudioLayer:
 
     def test_delete_audio_layer_stops_layer(self):
         """Test deleting a layer stops it first."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
         layer = player._audio_layers["layer1"]
         layer.play()
@@ -242,12 +242,12 @@ class TestSoundPlayerDeleteAudioLayer:
         assert layer.status() == STATUS.STOPPED
 
 
-class TestSoundPlayerPlay:
+class TestBaseSoundPlayerPlay:
     """Tests for play method."""
 
     def test_play_no_argument_starts_all_layers(self):
         """Test play() with no argument starts all layers."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
         player.create_audio_layer("layer2")
         player.create_audio_layer("layer3")
@@ -262,7 +262,7 @@ class TestSoundPlayerPlay:
 
     def test_play_starts_only_stopped_layers(self):
         """Test play() only starts layers that aren't already playing."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
         player.create_audio_layer("layer2")
 
@@ -280,7 +280,7 @@ class TestSoundPlayerPlay:
 
     def test_play_specific_layer(self):
         """Test play(layer_id) starts only that layer."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
         player.create_audio_layer("layer2")
 
@@ -294,19 +294,19 @@ class TestSoundPlayerPlay:
 
     def test_play_changes_player_status(self):
         """Test play() changes player status to PLAYING."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
         player.play()
         assert player.status() == STATUS.PLAYING
         player.stop()
 
 
-class TestSoundPlayerPause:
+class TestBaseSoundPlayerPause:
     """Tests for pause method."""
 
     def test_pause_no_argument_pauses_all_layers(self):
         """Test pause() with no argument pauses all layers."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
         player.create_audio_layer("layer2")
 
@@ -321,7 +321,7 @@ class TestSoundPlayerPause:
 
     def test_pause_specific_layer(self):
         """Test pause(layer_id) pauses only that layer."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
         player.create_audio_layer("layer2")
 
@@ -336,7 +336,7 @@ class TestSoundPlayerPause:
 
     def test_pause_changes_player_status(self):
         """Test pause() changes player status to PAUSED."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
         player.play()
         player.pause()
@@ -344,12 +344,12 @@ class TestSoundPlayerPause:
         player.stop()
 
 
-class TestSoundPlayerStop:
+class TestBaseSoundPlayerStop:
     """Tests for stop method."""
 
     def test_stop_no_argument_stops_all_layers(self):
         """Test stop() with no argument stops all layers."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
         player.create_audio_layer("layer2")
 
@@ -361,7 +361,7 @@ class TestSoundPlayerStop:
 
     def test_stop_specific_layer(self):
         """Test stop(layer_id) stops only that layer."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
         player.create_audio_layer("layer2")
 
@@ -376,19 +376,19 @@ class TestSoundPlayerStop:
 
     def test_stop_changes_player_status(self):
         """Test stop() changes player status to STOPPED."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
         player.play()
         player.stop()
         assert player.status() == STATUS.STOPPED
 
 
-class TestSoundPlayerGetItem:
+class TestBaseSoundPlayerGetItem:
     """Tests for __getitem__ method."""
 
     def test_getitem_returns_layer(self):
         """Test that player[layer_id] returns the audio layer."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
         player.create_audio_layer("layer1")
 
         layer = player["layer1"]
@@ -396,7 +396,7 @@ class TestSoundPlayerGetItem:
 
     def test_getitem_nonexistent_layer(self):
         """Test that player[nonexistent] raises KeyError."""
-        player = SoundPlayer()
+        player = LinuxSoundPlayer()
 
         with pytest.raises(KeyError):
             _ = player["nonexistent"]

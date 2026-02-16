@@ -3,15 +3,12 @@
 import logging
 import threading
 import time
-from typing import TYPE_CHECKING
 
 import numpy as np
 
 from .core.audio_config import AudioConfig
 from .core.state import STATUS, StatusObject
-
-if TYPE_CHECKING:
-    from .mixer import AudioMixer
+from .mixer import AudioMixer
 
 logger = logging.getLogger(__name__)
 
@@ -55,9 +52,6 @@ class AudioLayer(StatusObject):
         self._queue_current = []
         self._thread = None
         self._lock = threading.RLock()
-
-        # Import mixer here to avoid circular imports
-        from .mixer import AudioMixer
 
         # Create mixer for this layer
         self._mixer: AudioMixer = AudioMixer(self._config, volume / 100.0)

@@ -9,12 +9,12 @@ Install it with: pip install sound-player[linux]
 """
 
 import logging
-import threading
 
 import numpy as np
 import soundfile as sf
 
-from sound_player.core import STATUS, AudioConfig, BaseSound
+from sound_player.core import AudioConfig
+from sound_player.core.base_sound import BaseSound
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +44,7 @@ class LinuxPCMSound(BaseSound):
             loop: Number of times to loop (-1 for infinite)
             volume: Volume level (0-100)
         """
-        super().__init__(filepath, loop, volume)
-        self._config = config or AudioConfig()
+        super().__init__(filepath, config, loop, volume)
 
         # Audio file info
         self._file_info = sf.info(filepath)
@@ -61,21 +60,6 @@ class LinuxPCMSound(BaseSound):
         # Resampling buffers
         self._resample_buffer: np.ndarray | None = None
         self._resample_position = 0
-
-        # Lock for thread safety
-        self._lock = threading.Lock()
-
-    def get_audio_config(self) -> AudioConfig:
-        """Get the audio configuration for this sound."""
-        return self._config
-
-    def get_sample_rate(self) -> int:
-        """Return the target sample rate for mixing."""
-        return self._config.sample_rate
-
-    def get_channels(self) -> int:
-        """Return the target number of channels for mixing."""
-        return self._config.channels
 
     def _do_play(self):
         """Start or resume playback."""
@@ -105,17 +89,16 @@ class LinuxPCMSound(BaseSound):
     def _do_stop(self):
         """Stop playback and reset position."""
         logger.debug("LinuxPCMSound._do_stop()")
-        with self._lock:
-            if self._sound_file is not None:
-                self._sound_file.close()
-                self._sound_file = None
-            self._position = 0
-            self._loop_count = 0
-            self._is_eof = False
-            self._resample_buffer = None
-            self._resample_position = 0
+        if self._sound_file is not None:
+            self._sound_file.close()
+            self._sound_file = None
+        self._position = 0
+        self._loop_count = 0
+        self._is_eof = False
+        self._resample_buffer = None
+        self._resample_position = 0
 
-    def get_next_chunk(self, size: int) -> np.ndarray | None:
+    def _do_get_next_chunk(self, size: int) -> np.ndarray | None:
         """Get the next chunk of audio data.
 
         Args:
@@ -125,12 +108,8 @@ class LinuxPCMSound(BaseSound):
             Audio data as numpy array with shape (size, config.channels)
             Returns None if sound has ended and no more loops
         """
-        with self._lock:
-            if self._status == STATUS.STOPPED or self._status == STATUS.PAUSED:
-                return None
-
-            if self._sound_file is None:
-                return None
+        if self._sound_file is None:
+            return None
 
         # Check if we need resampling or channel conversion
         needs_conversion = (
@@ -144,99 +123,97 @@ class LinuxPCMSound(BaseSound):
 
     def _get_raw_chunk(self, size: int) -> np.ndarray | None:
         """Get a chunk without format conversion."""
-        with self._lock:
-            if self._sound_file is None:
-                return None
+        if self._sound_file is None:
+            return None
 
-            # Read samples from file
-            data = self._sound_file.read(size, dtype=self._config.dtype)
-            self._position += len(data)
+        # Read samples from file
+        data = self._sound_file.read(size, dtype=self._config.dtype)
+        self._position += len(data)
 
-            # Handle end of file and looping
-            if len(data) < size:
-                if self._check_loop():
-                    # Seek to beginning and read remaining samples
-                    self._sound_file.seek(0)
-                    remaining = size - len(data)
-                    extra = self._sound_file.read(remaining, dtype=self._config.dtype)
-                    if len(extra) > 0:
-                        data = np.concatenate([data, extra])
-                        self._position = len(extra)
+        # Handle end of file and looping
+        if len(data) < size:
+            if self._check_loop():
+                # Seek to beginning and read remaining samples
+                self._sound_file.seek(0)
+                remaining = size - len(data)
+                extra = self._sound_file.read(remaining, dtype=self._config.dtype)
+                if len(extra) > 0:
+                    data = np.concatenate([data, extra])
+                    self._position = len(extra)
+            else:
+                # No more loops, pad with zeros and mark as done
+                if len(data) > 0:
+                    padding = np.zeros((size - len(data), self._file_channels), dtype=self._config.dtype)
+                    data = np.concatenate([data, padding])
                 else:
-                    # No more loops, pad with zeros and mark as done
-                    if len(data) > 0:
-                        padding = np.zeros((size - len(data), self._file_channels), dtype=self._config.dtype)
-                        data = np.concatenate([data, padding])
-                    else:
-                        data = np.zeros((size, self._file_channels), dtype=self._config.dtype)
-                    self._is_eof = True
+                    data = np.zeros((size, self._file_channels), dtype=self._config.dtype)
+                self._is_eof = True
 
-            # Ensure shape is (size, channels)
-            if data.ndim == 1:
-                data = data.reshape(-1, 1)
+        # Ensure shape is (size, channels)
+        if data.ndim == 1:
+            data = data.reshape(-1, 1)
 
-            return data
+        return data
 
     def _get_converted_chunk(self, size: int) -> np.ndarray | None:
         """Get a chunk with sample rate and/or channel conversion."""
-        with self._lock:
-            if self._sound_file is None:
-                return None
+        if self._sound_file is None:
+            return None
 
-            result = np.zeros((size, self._config.channels), dtype=self._config.dtype)
-            result_pos = 0
+        result = np.zeros((size, self._config.channels), dtype=self._config.dtype)
+        result_pos = 0
 
-            while result_pos < size:
-                # Check if we need to read more data
-                if self._resample_buffer is None or self._resample_position >= len(self._resample_buffer):
-                    # Calculate how many file samples we need for the output
-                    ratio = self._file_sample_rate / self._config.sample_rate
-                    file_samples_needed = int((size - result_pos) * ratio) + 1
+        while result_pos < size:
+            # Check if we need to read more data
+            if self._resample_buffer is None or self._resample_position >= len(self._resample_buffer):
+                # Calculate how many file samples we need for the output
+                ratio = self._file_sample_rate / self._config.sample_rate
+                file_samples_needed = int((size - result_pos) * ratio) + 1
 
-                    # Read from file
-                    data = self._sound_file.read(file_samples_needed, dtype=self._config.dtype)
-                    self._position += len(data)
+                # Read from file
+                data = self._sound_file.read(file_samples_needed, dtype=self._config.dtype)
+                self._position += len(data)
 
-                    # Handle EOF
-                    if len(data) < file_samples_needed:
-                        if self._check_loop():
-                            self._sound_file.seek(0)
-                            # Read remaining for this block
-                            extra = self._sound_file.read(file_samples_needed - len(data), dtype=self._config.dtype)
-                            if len(extra) > 0:
-                                data = np.concatenate([data, extra])
-                                self._position = len(extra)
-                        else:
-                            self._is_eof = True
-                            if len(data) == 0:
-                                break
+                # Handle EOF
+                if len(data) < file_samples_needed:
+                    if self._check_loop():
+                        self._sound_file.seek(0)
+                        # Read remaining for this block
+                        extra = self._sound_file.read(file_samples_needed - len(data), dtype=self._config.dtype)
+                        if len(extra) > 0:
+                            data = np.concatenate([data, extra])
+                            self._position = len(extra)
+                    else:
+                        self._is_eof = True
+                        if len(data) == 0:
+                            break
 
-                    # Convert channels if needed
-                    if data.ndim == 1:
-                        data = data.reshape(-1, 1)
-                    if self._file_channels != self._config.channels:
-                        data = self._convert_channels(data)
+                # Convert channels if needed
+                if data.ndim == 1:
+                    data = data.reshape(-1, 1)
+                if self._file_channels != self._config.channels:
+                    data = self._convert_channels(data)
 
-                    # Resample if needed
-                    if self._file_sample_rate != self._config.sample_rate:
-                        data = self._resample(data)
+                # Resample if needed
+                if self._file_sample_rate != self._config.sample_rate:
+                    data = self._resample(data)
 
-                    self._resample_buffer = data
-                    self._resample_position = 0
+                self._resample_buffer = data
+                self._resample_position = 0
 
-                # Copy from resample buffer to result
-                if self._resample_buffer is not None:
-                    available = len(self._resample_buffer) - self._resample_position
-                    needed = size - result_pos
-                    to_copy = min(available, needed)
+            # Copy from resample buffer to result
+            if self._resample_buffer is not None:
+                available = len(self._resample_buffer) - self._resample_position
+                needed = size - result_pos
+                to_copy = min(available, needed)
 
-                    result[result_pos : result_pos + to_copy] = self._resample_buffer[
-                        self._resample_position : self._resample_position + to_copy
-                    ]
-                    result_pos += to_copy
-                    self._resample_position += to_copy
+                result[result_pos : result_pos + to_copy] = self._resample_buffer[
+                    self._resample_position : self._resample_position + to_copy
+                ]
+                result_pos += to_copy
+                self._resample_position += to_copy
 
-            return result
+        return result
 
     def _convert_channels(self, data: np.ndarray) -> np.ndarray:
         """Convert audio data to target channel count."""
@@ -291,19 +268,18 @@ class LinuxPCMSound(BaseSound):
         # Return True if we should continue looping
         return self._loop is not None and self._loop_count < self._loop
 
-    def seek(self, position: float) -> None:
+    def _do_seek(self, position: float) -> None:
         """Seek to position in seconds.
 
         Args:
             position: Position in seconds
         """
-        with self._lock:
-            if self._sound_file is not None:
-                sample_position = int(position * self._file_sample_rate)
-                self._sound_file.seek(sample_position)
-                self._position = sample_position
-                self._resample_buffer = None
-                self._resample_position = 0
+        if self._sound_file is not None:
+            sample_position = int(position * self._file_sample_rate)
+            self._sound_file.seek(sample_position)
+            self._position = sample_position
+            self._resample_buffer = None
+            self._resample_position = 0
 
     def __del__(self):
         """Cleanup on deletion."""

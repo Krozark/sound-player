@@ -7,11 +7,11 @@ audio playback on Android using:
 """
 
 import logging
-import threading
 
 import numpy as np
 
-from sound_player.core import STATUS, AudioConfig, BaseSound
+from sound_player.core import AudioConfig
+from sound_player.core.base_sound import BaseSound
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +79,7 @@ class AndroidPCMSound(BaseSound):
         if not ANDROID_AVAILABLE:
             raise RuntimeError("Android APIs not available")
 
-        super().__init__(filepath, loop, volume)
-        self._config = config or AudioConfig()
+        super().__init__(filepath, config, loop, volume)
 
         # Playback state
         self._mediaplayer: MediaPlayer | None = None
@@ -92,23 +91,10 @@ class AndroidPCMSound(BaseSound):
         # Buffer for decoded audio
         self._buffer: np.ndarray | None = None
         self._buffer_position = 0
-        self._buffer_lock = threading.Lock()
 
         # Audio file info
         self._file_sample_rate = self.SAMPLE_RATE_44100
         self._file_channels = 2
-
-    def get_audio_config(self) -> AudioConfig:
-        """Get the audio configuration for this sound."""
-        return self._config
-
-    def get_sample_rate(self) -> int:
-        """Return the target sample rate for mixing."""
-        return self._config.sample_rate
-
-    def get_channels(self) -> int:
-        """Return the target number of channels for mixing."""
-        return self._config.channels
 
     def _do_play(self):
         """Start or resume playback."""
@@ -143,10 +129,8 @@ class AndroidPCMSound(BaseSound):
         self._is_playing = False
         self._is_eof = False
         self._loop_done = 0
-
-        with self._buffer_lock:
-            self._buffer = None
-            self._buffer_position = 0
+        self._buffer = None
+        self._buffer_position = 0
 
     def _setup_event_handlers(self):
         """Setup MediaPlayer completion listener."""
@@ -194,7 +178,7 @@ class AndroidPCMSound(BaseSound):
             self._mediaplayer.release()
             self._mediaplayer = None
 
-    def get_next_chunk(self, size: int) -> np.ndarray | None:
+    def _do_get_next_chunk(self, size: int) -> np.ndarray | None:
         """Get the next chunk of audio data.
 
         Note: This is a simplified implementation that returns silence.
@@ -207,9 +191,6 @@ class AndroidPCMSound(BaseSound):
         Returns:
             Audio data as numpy array with shape (size, config.channels)
         """
-        if self._status == STATUS.STOPPED or self._status == STATUS.PAUSED:
-            return None
-
         if self._is_eof:
             return None
 
@@ -217,7 +198,7 @@ class AndroidPCMSound(BaseSound):
         # the MediaPlayer output to PCM buffers
         return np.zeros((size, self._config.channels), dtype=self._config.dtype)
 
-    def seek(self, position: float) -> None:
+    def _do_seek(self, position: float) -> None:
         """Seek to position in seconds.
 
         Args:

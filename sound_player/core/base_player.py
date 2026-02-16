@@ -1,33 +1,42 @@
-"""SoundPlayer module for managing multiple audio layers."""
+"""BaseSoundPlayer class for platform-specific audio output.
+
+This module provides the BaseSoundPlayer abstract base class which defines
+the interface for platform-specific audio output implementations.
+"""
 
 import logging
 import threading
+from abc import ABC, abstractmethod
 
 import numpy as np
 
-from .audiolayer import AudioLayer
-from .core.audio_config import AudioConfig
-from .core.state import STATUS, StatusObject
+from sound_player.audiolayer import AudioLayer
+
+from .audio_config import AudioConfig
+from .state import STATUS, StatusObject
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "SoundPlayer",
+    "BaseSoundPlayer",
 ]
 
 
-class SoundPlayer(StatusObject):
-    """Manages multiple audio layers with master mixing.
+class BaseSoundPlayer(StatusObject, ABC):
+    """Base class for platform-specific audio output.
 
-    The SoundPlayer:
-    - Creates and manages named AudioLayers
-    - Mixes output from all active layers
-    - Provides master volume control
+    The BaseSoundPlayer:
+    - Manages multiple audio layers with independent mixing
     - Handles bulk operations across layers
+    - Delegates actual audio output to platform-specific subclasses
+
+    Platform-specific implementations must implement:
+    - _create_output_stream(): Create the platform's audio output stream
+    - _close_output_stream(): Close/release the audio output stream
     """
 
     def __init__(self, config: AudioConfig | None = None):
-        """Initialize the SoundPlayer.
+        """Initialize the BaseSoundPlayer.
 
         Args:
             config: AudioConfig for audio output format
@@ -36,36 +45,30 @@ class SoundPlayer(StatusObject):
         self._config = config or AudioConfig()
         self._audio_layers: dict[str, AudioLayer] = {}
         self._lock = threading.RLock()
-        self._master_volume = 1.0
-
-        # Master mixer for combining all audio layers
-        from .mixer import AudioMixer
-
-        self._master_mixer: AudioMixer = AudioMixer(self._config, volume=1.0)
+        self._volume = 1.0
 
     @property
     def config(self) -> AudioConfig:
         """Get the audio configuration."""
         return self._config
 
-    def set_master_volume(self, volume: float) -> None:
-        """Set the master volume.
+    def set_volume(self, volume: float) -> None:
+        """Set the volume.
 
         Args:
-            volume: Master volume (0.0 to 1.0)
+            volume: Volume (0.0 to 1.0)
         """
-        logger.debug("SoundPlayer.set_master_volume(%s)", volume)
+        logger.debug("BaseSoundPlayer.set_volume(%s)", volume)
         with self._lock:
-            self._master_volume = max(0.0, min(1.0, volume))
-            self._master_mixer.set_volume(self._master_volume)
+            self._volume = max(0.0, min(1.0, volume))
 
-    def get_master_volume(self) -> float:
-        """Get the master volume.
+    def get_volume(self) -> float:
+        """Get the volume.
 
         Returns:
-            Master volume (0.0 to 1.0)
+            Volume (0.0 to 1.0)
         """
-        return self._master_volume
+        return self._volume
 
     def create_audio_layer(self, layer, force=False, *args, **kwargs):
         """Create a new audio layer.
@@ -75,13 +78,14 @@ class SoundPlayer(StatusObject):
             force: If True, overwrite existing layer
             *args, **kwargs: Arguments passed to AudioLayer constructor
         """
-        logger.debug("SoundPlayer.create_audio_layer(%s)", layer)
+        logger.debug("BaseSoundPlayer.create_audio_layer(%s)", layer)
         with self._lock:
             if layer in self._audio_layers:
                 if not force:
                     logger.warning(f"AudioLayer {layer} already exists")
                     return
                 logger.debug(f"AudioLayer {layer} exists, overwriting due to force=True")
+
             # Pass config to AudioLayer if not provided
             if "config" not in kwargs:
                 kwargs["config"] = self._config
@@ -94,7 +98,7 @@ class SoundPlayer(StatusObject):
             sound: The sound to enqueue
             layer: The audio layer to add to
         """
-        logger.debug("SoundPlayer.enqueue(%s, %s)", sound, layer)
+        logger.debug("BaseSoundPlayer.enqueue(%s, %s)", sound, layer)
         if layer not in self._audio_layers:
             logger.error(f"AudioLayer {layer} not found")
             return
@@ -116,7 +120,7 @@ class SoundPlayer(StatusObject):
         Returns:
             STATUS of the specified layer or player
         """
-        logger.debug("SoundPlayer.status(%s)", layer)
+        logger.debug("BaseSoundPlayer.status(%s)", layer)
         if layer is not None:
             return self._audio_layers[layer].status()
         return super().status()
@@ -127,7 +131,7 @@ class SoundPlayer(StatusObject):
         Returns:
             Dictionary keys of all audio layers
         """
-        logger.debug("SoundPlayer.get_audio_layers()")
+        logger.debug("BaseSoundPlayer.get_audio_layers()")
         return self._audio_layers.keys()
 
     def clear(self, layer=None):
@@ -136,7 +140,7 @@ class SoundPlayer(StatusObject):
         Args:
             layer: Specific layer to clear, or None for all layers
         """
-        logger.debug("SoundPlayer.clear(%s)", layer)
+        logger.debug("BaseSoundPlayer.clear(%s)", layer)
         if layer is not None:
             self._audio_layers[layer].clear()
         else:
@@ -149,57 +153,10 @@ class SoundPlayer(StatusObject):
         Args:
             layer: The layer to delete
         """
-        logger.debug("SoundPlayer.delete_audio_layer(%s)", layer)
+        logger.debug("BaseSoundPlayer.delete_audio_layer(%s)", layer)
         with self._lock:
             self._audio_layers[layer].stop()
             del self._audio_layers[layer]
-
-    def play(self, layer=None):
-        """Start playback of a layer or all layers.
-
-        Args:
-            layer: Specific layer to play, or None for all layers
-        """
-        logger.debug("SoundPlayer.play(%s)", layer)
-        with self._lock:
-            if layer is not None:
-                return self._audio_layers[layer].play()
-            else:
-                for audio_layer in self._audio_layers.values():
-                    if audio_layer.status() != STATUS.PLAYING:
-                        audio_layer.play()
-                super().play()
-
-    def pause(self, layer=None):
-        """Pause playback of a layer or all layers.
-
-        Args:
-            layer: Specific layer to pause, or None for all layers
-        """
-        logger.debug("SoundPlayer.pause(%s)", layer)
-        with self._lock:
-            if layer is not None:
-                return self._audio_layers[layer].pause()
-            else:
-                for audio_layer in self._audio_layers.values():
-                    if audio_layer.status() != STATUS.PAUSED:
-                        audio_layer.pause()
-                super().pause()
-
-    def stop(self, layer=None):
-        """Stop playback of a layer or all layers.
-
-        Args:
-            layer: Specific layer to stop, or None for all layers
-        """
-        logger.debug("SoundPlayer.stop(%s)", layer)
-        with self._lock:
-            if layer is not None:
-                return self._audio_layers[layer].stop()
-            else:
-                for audio_layer in self._audio_layers.values():
-                    audio_layer.stop()
-                super().stop()
 
     def __getitem__(self, layer):
         """Get an audio layer by name.
@@ -215,8 +172,12 @@ class SoundPlayer(StatusObject):
     def get_next_chunk(self) -> np.ndarray:
         """Get the next mixed chunk from all active audio layers.
 
+        This method is called by the platform-specific audio output
+        implementation to get the next buffer of mixed audio data.
+
         Returns:
-            Mixed audio buffer from all active layers
+            Mixed audio buffer from all active layers with shape
+            (config.buffer_size, config.channels)
         """
         active_layers = [layer for layer in self._audio_layers.values() if layer.status() == STATUS.PLAYING]
 
@@ -235,11 +196,10 @@ class SoundPlayer(StatusObject):
         for layer in active_layers:
             chunk = layer.get_next_chunk()
             if chunk is not None and chunk.size > 0:
-                # Apply layer volume (already applied by layer mixer, but master volume applied here)
                 mixed += chunk.astype(np.float32)
 
-        # Apply master volume and clip
-        mixed *= self._master_volume
+        # Apply volume and clip
+        mixed *= self._volume
         mixed = np.clip(
             mixed,
             self._config.min_sample_value,
@@ -247,3 +207,21 @@ class SoundPlayer(StatusObject):
         )
 
         return mixed.astype(self._config.dtype)
+
+    @abstractmethod
+    def _create_output_stream(self):
+        """Create the platform-specific audio output stream.
+
+        This method is called when starting playback. The implementation
+        should create and configure the audio output device/stream.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def _close_output_stream(self):
+        """Close the platform-specific audio output stream.
+
+        This method is called when stopping playback. The implementation
+        should release any audio device resources.
+        """
+        raise NotImplementedError()
