@@ -1,23 +1,17 @@
-"""Android PCM audio implementation using AudioTrack.
+"""Android platform implementation for the sound-player library.
 
-This module provides the AndroidPCMSound class which implements PCM-based
-audio playback on Android using:
-- AudioTrack for real-time PCM output
-- Android media APIs for audio decoding
+This module provides Android-specific audio functionality including MediaPlayer-based
+audio playback.
 """
 
 import logging
 import threading
-from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .audio_config import AudioConfig
-from .common import STATUS
-from .sound import BaseSound
-
-if TYPE_CHECKING:
-    pass
+from ...audio_config import AudioConfig
+from ...common import STATUS
+from ...sound import BaseSound
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +31,7 @@ except Exception:
     logger.warning("Android APIs not available")
 
 __all__ = [
+    "Sound",
     "AndroidPCMSound",
     "AndroidSound",
     "ANDROID_AVAILABLE",
@@ -241,3 +236,6 @@ class AndroidPCMSound(BaseSound):
 
 # For backward compatibility
 AndroidSound = AndroidPCMSound
+
+# For direct access
+Sound = AndroidSound = AndroidPCMSound

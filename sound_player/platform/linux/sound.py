@@ -10,24 +10,17 @@ Install it with: pip install sound-player[linux]
 
 import logging
 import threading
-from typing import TYPE_CHECKING
 
 import numpy as np
 import soundfile as sf
 
-from .audio_config import AudioConfig
-from .common import STATUS
-from .sound import BaseSound
-
-if TYPE_CHECKING:
-    pass
+from ...audio_config import AudioConfig
+from ...common import STATUS
+from ...sound import BaseSound
 
 logger = logging.getLogger(__name__)
 
-__all__ = [
-    "LinuxPCMSound",
-    "LinuxSound",
-]
+__all__ = ["LinuxPCMSound"]
 
 
 class LinuxPCMSound(BaseSound):
@@ -315,7 +308,3 @@ class LinuxPCMSound(BaseSound):
     def __del__(self):
         """Cleanup on deletion."""
         self._do_stop()
-
-
-# For backward compatibility
-LinuxSound = LinuxPCMSound

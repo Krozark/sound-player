@@ -7,7 +7,7 @@ import pytest
 
 from sound_player.audio_config import AudioConfig
 from sound_player.common import STATUS
-from sound_player.linux_pcm import LinuxPCMSound
+from sound_player.platform.linux import LinuxPCMSound
 
 
 @pytest.fixture
@@ -162,7 +162,7 @@ class TestLinuxPCMSound:
         result = linux_sound._convert_channels(data)
         assert np.array_equal(result, data)
 
-    @patch("sound_player.linux_pcm.sf.SoundFile")
+    @patch("sound_player.platform.linux.sound.sf.SoundFile")
     def test_resample(self, mock_soundfile, linux_sound):
         """Test resampling functionality."""
         # Create test data
@@ -201,7 +201,7 @@ class TestLinuxPCMSound:
 
     def test_backward_compatibility_alias(self, mock_audio_file, audio_config):
         """Test that LinuxSound alias exists."""
-        from sound_player.linux_pcm import LinuxSound
+        from sound_player.platform.linux import LinuxSound
 
         sound = LinuxSound(mock_audio_file, config=audio_config)
         assert isinstance(sound, LinuxPCMSound)
@@ -213,7 +213,7 @@ class TestLinuxPCMSound:
         assert sound._file_sample_rate == 44100
         assert sound._file_channels == 2
 
-    @patch("sound_player.linux_pcm.sf.info")
+    @patch("sound_player.platform.linux.sound.sf.info")
     def test_different_file_formats(self, mock_info, tmp_path, audio_config):
         """Test handling different file formats."""
         # Mock different file info
