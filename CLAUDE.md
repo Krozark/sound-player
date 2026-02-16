@@ -39,7 +39,7 @@ sound-player/
 │   ├── audiolayer.py      # AudioLayer class with mixer
 │   ├── player.py          # SoundPlayer for managing layers
 │   ├── sound.py           # BaseSound abstract class
-│   ├── common.py          # STATUS enum and StatusObject
+│   ├── common.py          # STATUS enum and StatusMixin
 │   ├── linux_pcm.py       # Linux PCM implementation
 │   └── android_pcm.py     # Android PCM implementation
 ├── tests/                 # Unit tests

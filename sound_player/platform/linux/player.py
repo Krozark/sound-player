@@ -5,9 +5,8 @@ output on Linux using the sounddevice library.
 """
 
 import logging
-import threading
 
-from sound_player.core import STATUS, AudioConfig
+from sound_player.core import STATUS
 from sound_player.core.base_player import BaseSoundPlayer
 
 try:
@@ -34,15 +33,14 @@ class LinuxSoundPlayer(BaseSoundPlayer):
     - Supports play/pause/stop control
     """
 
-    def __init__(self, config: AudioConfig | None = None):
+    def __init__(self, *args, **kwargs):
         """Initialize the LinuxSoundPlayer.
 
         Args:
             config: AudioConfig for audio output format
         """
-        super().__init__(config or AudioConfig())
+        super().__init__(*args, **kwargs)
         self._stream = None
-        self._lock = threading.RLock()
 
     def _create_output_stream(self):
         """Create the sounddevice output stream.
@@ -106,7 +104,7 @@ class LinuxSoundPlayer(BaseSoundPlayer):
                 self._stream.close()
                 self._stream = None
 
-    def play(self, layer=None):
+    def play(self, layer=None, *args, **kwargs):
         """Start playback of a layer or all layers.
 
         Args:
@@ -115,24 +113,16 @@ class LinuxSoundPlayer(BaseSoundPlayer):
         For the player (layer=None), this also starts the audio output stream.
         """
         logger.debug("LinuxSoundPlayer.play(%s)", layer)
-        with self._lock:
-            if layer is not None:
-                # Play specific layer only
-                return self._audio_layers[layer].play()
-            else:
-                # Play all layers and start output stream
-                for audio_layer in self._audio_layers.values():
-                    if audio_layer.status() != STATUS.PLAYING:
-                        audio_layer.play()
-                super().play()
+        if layer is not None:
+            # Play specific layer only
+            return self._audio_layers[layer].play()
+        else:
+            # Play all layers and start output stream
+            for audio_layer in self._audio_layers.values():
+                audio_layer.play()
+            super().play(*args, **kwargs)
 
-                # Start the audio output stream
-                if self._stream is None:
-                    self._create_output_stream()
-                if not self._stream.active:
-                    self._stream.start()
-
-    def pause(self, layer=None):
+    def pause(self, layer=None, *args, **kwargs):
         """Pause playback of a layer or all layers.
 
         Args:
@@ -150,13 +140,9 @@ class LinuxSoundPlayer(BaseSoundPlayer):
                 for audio_layer in self._audio_layers.values():
                     if audio_layer.status() != STATUS.PAUSED:
                         audio_layer.pause()
-                super().pause()
+                super().pause(*args, **kwargs)
 
-                # Stop the audio output stream
-                if self._stream and self._stream.active:
-                    self._stream.stop()
-
-    def stop(self, layer=None):
+    def stop(self, layer=None, *args, **kwargs):
         """Stop playback of a layer or all layers.
 
         Args:
@@ -173,11 +159,32 @@ class LinuxSoundPlayer(BaseSoundPlayer):
                 # Stop all layers and close output stream
                 for audio_layer in self._audio_layers.values():
                     audio_layer.stop()
-                super().stop()
+                super().stop(*args, **kwargs)
 
-                # Close the audio output stream
-                self._close_output_stream()
+    # Hooks for StatusMixin
+
+    def _do_play(self):
+        """Hook called when play status changes to PLAYING."""
+        # Start the audio output stream
+        if self._stream is None:
+            self._create_output_stream()
+        if not self._stream.active:
+            self._stream.start()
+
+    def _do_pause(self):
+        """Hook called when play status changes to PAUSED."""
+        # Stop the audio output stream
+        if self._stream and self._stream.active:
+            self._stream.stop()
+
+    def _do_stop(self):
+        """Hook called when play status changes to STOPPED."""
+        # Close the audio output stream
+        self._close_output_stream()
 
     def __del__(self):
         """Cleanup on deletion."""
-        self._close_output_stream()
+        import contextlib
+
+        with contextlib.suppress(Exception):
+            self._close_output_stream()

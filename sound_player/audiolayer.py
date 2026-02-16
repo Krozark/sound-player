@@ -6,8 +6,7 @@ import time
 
 import numpy as np
 
-from .core.audio_config import AudioConfig
-from .core.state import STATUS, StatusObject
+from .core.mixins import STATUS, AudioConfigMixin, StatusMixin
 from .mixer import AudioMixer
 
 logger = logging.getLogger(__name__)
@@ -17,7 +16,7 @@ __all__ = [
 ]
 
 
-class AudioLayer(StatusObject):
+class AudioLayer(StatusMixin, AudioConfigMixin):
     """Manages a queue of sounds with support for concurrent playback and mixing.
 
     The AudioLayer maintains two queues:
@@ -32,7 +31,7 @@ class AudioLayer(StatusObject):
     - mixer: AudioMixer for mixing current sounds together
     """
 
-    def __init__(self, concurrency=1, replace=False, loop=None, volume=1.0, config: AudioConfig | None = None):
+    def __init__(self, concurrency=1, replace=False, loop=None, *args, **kwargs):
         """Initialize the AudioLayer.
 
         Args:
@@ -42,24 +41,16 @@ class AudioLayer(StatusObject):
             volume: Layer volume (0.0-1.0)
             config: AudioConfig for the mixer
         """
-        super().__init__()
+        super().__init__(*args, **kwargs)
         self._concurrency = concurrency
         self._replace_on_add = replace
         self._loop = loop
-        self._volume = max(0.0, min(1.0, volume))
-        self._config = config or AudioConfig()
         self._queue_waiting = []
         self._queue_current = []
         self._thread = None
-        self._lock = threading.RLock()
 
         # Create mixer for this layer
-        self._mixer: AudioMixer = AudioMixer(self._config, self._volume)
-
-    @property
-    def config(self) -> AudioConfig:
-        """Get the audio configuration."""
-        return self._config
+        self._mixer: AudioMixer = AudioMixer(self)
 
     @property
     def mixer(self) -> "AudioMixer":
@@ -96,17 +87,6 @@ class AudioLayer(StatusObject):
         with self._lock:
             self._loop = loop
 
-    def set_volume(self, volume: float):
-        """Set the layer volume.
-
-        Args:
-            volume: Volume level (0.0-1.0)
-        """
-        logger.debug("AudioLayer.set_volume(%s)", volume)
-        with self._lock:
-            self._volume = volume
-            self._mixer.set_volume(volume)
-
     def enqueue(self, sound):
         """Add a sound to the waiting queue.
 
@@ -133,35 +113,31 @@ class AudioLayer(StatusObject):
             self._queue_waiting.clear()
             self._queue_current.clear()
 
-    def pause(self):
-        """Pause playback of all current sounds."""
-        logger.debug("AudioLayer.pause()")
-        with self._lock:
-            super().pause()
-            for sound in self._queue_current:
-                sound.pause()
-
-    def stop(self):
+    def _do_stop(self, *args, **kwargs):
         """Stop playback and clear all queues."""
         logger.debug("AudioLayer.stop()")
         with self._lock:
-            if self._status != STATUS.STOPPED:
-                super().stop()
             self.clear()
 
-    def play(self):
-        """Start playback of the audio layer."""
-        logger.debug("AudioLayer.play()")
-        with self._lock:
-            super().play()
-            if self._thread is None:
-                logger.debug("Create audio layer Thread")
-                self._thread = threading.Thread(target=self._thread_task, daemon=True)
-                logger.debug("Start audio layer Thread")
-                self._thread.start()
+    def _do_play(self):
+        """Hook called when play status changes to PLAYING."""
+        if self._thread is None:
+            logger.debug("Create audio layer Thread")
+            self._thread = threading.Thread(target=self._thread_task, daemon=True)
+            logger.debug("Start audio layer Thread")
+            self._thread.start()
 
-            for sound in self._queue_current:
-                sound.play()
+        for sound in self._queue_current:
+            sound.play()
+
+    def _do_pause(self):
+        """Hook called when play status changes to PAUSED."""
+        for sound in self._queue_current:
+            sound.pause()
+
+    def _do_stop(self):
+        """Hook called when play status changes to STOPPED."""
+        pass  # clear() is called before super().stop() in our override
 
     def get_next_chunk(self) -> np.ndarray:
         """Get the next mixed audio chunk from this layer.

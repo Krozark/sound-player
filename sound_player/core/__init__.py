@@ -4,10 +4,12 @@ This module contains the base classes and enums used throughout the library.
 """
 
 from .audio_config import AudioConfig
-from .state import STATUS, StatusObject
+from .mixins import STATUS, AudioConfigMixin, StatusMixin, VolumeMixin
 
 __all__ = [
     "AudioConfig",
     "STATUS",
-    "StatusObject",
+    "StatusMixin",
+    "VolumeMixin",
+    "AudioConfigMixin",
 ]

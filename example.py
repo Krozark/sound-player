@@ -12,7 +12,7 @@ import argparse
 import logging
 import time
 
-from sound_player import AudioConfig, AudioLayer, Sound, SoundPlayer
+from sound_player import AudioConfig, Sound, SoundPlayer
 
 
 def setup_logging(verbosity: int = 0):
@@ -40,22 +40,27 @@ def test_basic_sound():
     print("Test 1: Basic Sound Playback")
     print("=" * 50)
 
+    player = SoundPlayer()
+    player.create_audio_layer("main", concurrency=1)
+
     sound = Sound("data/music.ogg")
+    player["main"].enqueue(sound)
+    time.sleep(3)
 
     print("Playing sound...")
-    sound.play()
+    player.play()
     time.sleep(3)
 
     print("Pausing sound...")
-    sound.pause()
+    player.pause()
     time.sleep(2)
 
     print("Resuming sound...")
-    sound.play()
+    player.play()
     time.sleep(3)
 
     print("Stopping sound...")
-    sound.stop()
+    player.stop()
     time.sleep(1)
 
 
@@ -65,21 +70,23 @@ def test_audio_layer_concurrency():
     print("Test 2: AudioLayer with Concurrency")
     print("=" * 50)
 
-    # Create an AudioLayer that allows up to 3 concurrent sounds
-    layer = AudioLayer(concurrency=3, replace=False)
+    player = SoundPlayer()
+
+    # Create an AudioLayer that allows up to 2 concurrent sounds
+    player.create_audio_layer("main", concurrency=2, replace=False)
 
     # Enqueue multiple sounds
-    layer.enqueue(Sound("data/coin.wav"))
-    layer.enqueue(Sound("data/music.ogg"))
-    layer.enqueue(Sound("data/coin.wav"))
-    layer.enqueue(Sound("data/coin.wav"))
+    player["main"].enqueue(Sound("data/coin.wav"))
+    player["main"].enqueue(Sound("data/music.ogg"))
+    player["main"].enqueue(Sound("data/coin.wav"))
+    player["main"].enqueue(Sound("data/coin.wav"))
 
     print("Playing layer with 3 concurrent sounds...")
-    layer.play()
+    player.play()
     time.sleep(5)
 
     print("Stopping layer...")
-    layer.stop()
+    player.stop()
     time.sleep(1)
 
 
@@ -89,24 +96,26 @@ def test_audio_layer_replace_mode():
     print("Test 3: AudioLayer with Replace Mode")
     print("=" * 50)
 
+    player = SoundPlayer()
+
     # Create an AudioLayer with replace mode
     # When limit is exceeded, oldest sounds are stopped
-    layer = AudioLayer(concurrency=2, replace=True)
+    player.create_audio_layer("main", concurrency=2, replace=True)
 
-    layer.enqueue(Sound("data/music.ogg"))
-    layer.enqueue(Sound("data/coin.wav"))
+    player["main"].enqueue(Sound("data/music.ogg"))
+    player["main"].enqueue(Sound("data/coin.wav"))
 
     print("Playing with 2 sounds...")
-    layer.play()
+    player.play()
     time.sleep(2)
 
     # Adding more sounds will replace the oldest ones
     print("Adding more sounds (replace mode)...")
-    layer.enqueue(Sound("data/coin.wav"))
-    layer.enqueue(Sound("data/coin.wav"))
+    player["main"].enqueue(Sound("data/coin.wav"))
+    player["main"].enqueue(Sound("data/coin.wav"))
     time.sleep(3)
 
-    layer.stop()
+    player.stop()
     time.sleep(1)
 
 
@@ -154,7 +163,7 @@ def test_volume_controls():
     player = SoundPlayer()
 
     # Create layers with different volumes
-    player.create_audio_layer("music", volume=1)  # 100% volume
+    player.create_audio_layer("music", volume=1.0)  # 100% volume
 
     player["music"].enqueue(Sound("data/music.ogg"))
 
@@ -182,25 +191,31 @@ def test_loop_functionality():
     print("Test 6: Loop Functionality")
     print("=" * 50)
 
-    # Test sound-level looping
+    # Test sound-level looping with a player
+    player = SoundPlayer()
+    player.create_audio_layer("test", concurrency=1)
+
     sound = Sound("data/coin.wav")
     sound.set_loop(3)  # Play 3 times
+    player["test"].enqueue(sound)
 
     print("Playing sound 3 times...")
-    sound.play()
-    sound.wait()
+    player.play()
+    time.sleep(2)  # Wait for sound to play
+    player.stop()
     time.sleep(1)
 
-    # Test layer-level looping
-    layer = AudioLayer(loop=2)  # All sounds play 2 times by default
-    layer.enqueue(Sound("data/coin.wav"))
-    layer.enqueue(Sound("data/coin.wav"))
+    # Delete the first layer and test layer-level looping
+    player.delete_audio_layer("test")
+    player.create_audio_layer("loop_test", loop=2, concurrency=1)
+    player["loop_test"].enqueue(Sound("data/coin.wav"))
+    player["loop_test"].enqueue(Sound("data/coin.wav"))
 
     print("Playing layer with loop=2...")
-    layer.play()
-    time.sleep(5)
+    player.play()
+    time.sleep(3)
 
-    layer.stop()
+    player.stop()
     time.sleep(1)
 
 
@@ -240,12 +255,12 @@ def main(verbosity: int = 0):
     print("SOUND PLAYER LIBRARY - EXAMPLES")
     print("=" * 50)
 
-    # test_basic_sound()
+    test_basic_sound()
     # test_audio_layer_concurrency()
     # test_audio_layer_replace_mode()
     # test_sound_player_multiple_layers()
     # test_volume_controls()
-    test_loop_functionality()
+    # test_loop_functionality()
     # test_audio_configuration()
 
     print("\n" + "=" * 50)

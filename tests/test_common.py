@@ -1,6 +1,6 @@
-"""Tests for common.py - STATUS enum and StatusObject class."""
+"""Tests for common.py - STATUS enum and StatusMixin class."""
 
-from sound_player.core.state import STATUS, StatusObject
+from sound_player.core import STATUS, StatusMixin
 
 
 class TestStatusEnum:
@@ -20,37 +20,50 @@ class TestStatusEnum:
         assert STATUS.STOPPED != STATUS.PLAYING
 
 
-class TestStatusObject:
-    """Tests for the StatusObject base class."""
+class ConcreteStatusMixin(StatusMixin):
+    """Concrete implementation of StatusMixin for testing."""
+
+    def _do_play(self):
+        pass
+
+    def _do_pause(self):
+        pass
+
+    def _do_stop(self):
+        pass
+
+
+class TestStatusMixin:
+    """Tests for the StatusMixin base class."""
 
     def test_initial_status_is_stopped(self):
-        """Test that StatusObject initializes with STOPPED status."""
-        obj = StatusObject()
+        """Test that StatusMixin initializes with STOPPED status."""
+        obj = ConcreteStatusMixin()
         assert obj.status() == STATUS.STOPPED
 
     def test_play_changes_status(self):
         """Test that play() changes status to PLAYING."""
-        obj = StatusObject()
+        obj = ConcreteStatusMixin()
         obj.play()
         assert obj.status() == STATUS.PLAYING
 
     def test_pause_changes_status(self):
         """Test that pause() changes status to PAUSED."""
-        obj = StatusObject()
+        obj = ConcreteStatusMixin()
         obj.play()
         obj.pause()
         assert obj.status() == STATUS.PAUSED
 
     def test_stop_changes_status(self):
         """Test that stop() changes status to STOPPED."""
-        obj = StatusObject()
+        obj = ConcreteStatusMixin()
         obj.play()
         obj.stop()
         assert obj.status() == STATUS.STOPPED
 
     def test_stop_from_paused(self):
         """Test that stop() works from PAUSED status."""
-        obj = StatusObject()
+        obj = ConcreteStatusMixin()
         obj.play()
         obj.pause()
         obj.stop()
@@ -58,7 +71,7 @@ class TestStatusObject:
 
     def test_multiple_play_calls(self):
         """Test that multiple play() calls result in PLAYING status."""
-        obj = StatusObject()
+        obj = ConcreteStatusMixin()
         obj.play()
         obj.play()
         obj.play()

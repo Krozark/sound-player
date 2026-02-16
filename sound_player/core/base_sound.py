@@ -1,13 +1,11 @@
 """Base sound class and PCM buffer interface for the sound player library."""
 
 import logging
-import threading
 import time
 
 import numpy as np
 
-from .audio_config import AudioConfig
-from .state import STATUS, StatusObject
+from .mixins import STATUS, AudioConfigMixin, StatusMixin
 
 logger = logging.getLogger(__name__)
 
@@ -16,59 +14,42 @@ __all__ = [
 ]
 
 
-class BaseSound(StatusObject):
-    def __init__(self, filepath, config: AudioConfig | None = None, loop=None, volume=None):
-        super().__init__()
+class BaseSound(StatusMixin, AudioConfigMixin):
+    """Base class for all sound types.
+
+    Provides PCM buffer interface and platform-specific hooks for
+    audio playback control.
+    """
+
+    def __init__(self, filepath, loop=None, *args, **kwargs):
+        """Initialize the BaseSound.
+
+        Args:
+            filepath: Path to the audio file
+            config: AudioConfig for audio format
+            loop: Loop count (-1 for infinite, None for no loop)
+            volume: Initial volume (0.0-1.0)
+        """
+        super().__init__(*args, **kwargs)
         self._filepath = filepath
-        self._config = config or AudioConfig()
         self._loop = loop
-        self._volume = volume
-        self._lock = threading.RLock()
 
     def set_loop(self, loop):
+        """Set the loop count.
+
+        Args:
+            loop: Loop count (-1 for infinite)
+        """
         logger.debug("BaseSound.set_loop(%s)", loop)
         with self._lock:
             self._loop = loop
 
-    def set_volume(self, volume: float):
-        logger.debug("BaseSound.set_volume(%s)", volume)
-        with self._lock:
-            self._volume = volume
-
-    def play(self):
-        logger.debug("BaseSound.play()")
-        with self._lock:
-            if self._status == STATUS.PLAYING:
-                return
-            elif self._status not in (STATUS.STOPPED, STATUS.PAUSED):
-                raise Exception()
-
-            self._do_play()
-            super().play()
-
-    def pause(self):
-        logger.debug("BaseSound.pause()")
-        with self._lock:
-            if self._status == STATUS.PAUSED:
-                return
-            elif self._status != STATUS.PLAYING:
-                raise Exception()
-
-            self._do_pause()
-            super().pause()
-
-    def stop(self):
-        logger.debug("BaseSound.stop()")
-        with self._lock:
-            if self._status == STATUS.STOPPED:
-                return
-            elif self._status not in (STATUS.PLAYING, STATUS.PAUSED):
-                raise Exception()
-
-            self._do_stop()
-            super().stop()
-
     def wait(self, timeout=None):
+        """Wait for the sound to finish playing.
+
+        Args:
+            timeout: Maximum time to wait in seconds, None for unlimited
+        """
         logger.debug("BaseSound.wait()")
         start_timestamps = time.time()
         while self._status != STATUS.STOPPED and (timeout is None or start_timestamps + timeout < time.time()):
@@ -94,7 +75,6 @@ class BaseSound(StatusObject):
         with self._lock:
             if self._status in (STATUS.STOPPED, STATUS.PAUSED):
                 return None
-
             return self._do_get_next_chunk(size)
 
     def _do_get_next_chunk(self, size: int) -> np.ndarray | None:
@@ -118,7 +98,7 @@ class BaseSound(StatusObject):
         Returns:
             Sample rate in Hz
         """
-        return self._config.sample_rate
+        return self.config.sample_rate
 
     def get_channels(self) -> int:
         """Return the number of audio channels.
@@ -126,15 +106,7 @@ class BaseSound(StatusObject):
         Returns:
             Number of channels (1=mono, 2=stereo)
         """
-        return self._config.channels
-
-    def get_audio_config(self) -> AudioConfig:
-        """Return the audio configuration for this sound.
-
-        Returns:
-            AudioConfig instance describing the audio format
-        """
-        return self._config
+        return self.config.channels
 
     def seek(self, position: float) -> None:
         """Seek to position in seconds.
@@ -146,21 +118,9 @@ class BaseSound(StatusObject):
         with self._lock:
             self._do_seek(position)
 
-    # Platform-specific implementations
-
-    def _do_play(self):
-        raise NotImplementedError()
-
-    def _do_pause(self):
-        raise NotImplementedError()
-
-    def _do_stop(self):
-        raise NotImplementedError()
-
     def _do_seek(self, position: float) -> None:
-        """Seek to position in seconds.
+        """Hook for subclasses to implement seeking.
 
-        Subclasses can override this to implement seeking.
         Called with the lock held.
 
         Args:

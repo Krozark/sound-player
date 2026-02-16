@@ -4,7 +4,7 @@ import time
 from unittest.mock import MagicMock
 
 from sound_player.audiolayer import AudioLayer
-from sound_player.core.state import STATUS
+from sound_player.core.mixins import STATUS
 
 
 class TestAudioLayerInit:
@@ -16,7 +16,7 @@ class TestAudioLayerInit:
         assert layer._concurrency == 1
         assert layer._replace_on_add is False
         assert layer._loop is None
-        assert layer._volume == 1.0
+        assert layer.volume == 1.0
         assert layer._queue_waiting == []
         assert layer._queue_current == []
         assert layer._thread is None
@@ -28,7 +28,7 @@ class TestAudioLayerInit:
         assert layer._concurrency == 3
         assert layer._replace_on_add is True
         assert layer._loop == 5
-        assert layer._volume == 0.5
+        assert layer.volume == 0.5
 
 
 class TestAudioLayerSetters:
@@ -56,7 +56,7 @@ class TestAudioLayerSetters:
         """Test set_volume method."""
         layer = AudioLayer()
         layer.set_volume(0.75)
-        assert layer._volume == 0.75
+        assert layer.volume == 0.75
 
 
 class TestAudioLayerEnqueue:
@@ -216,13 +216,13 @@ class TestAudioLayerStop:
         # Create sounds that return PLAYING status so thread doesn't remove them
         sound1 = MagicMock()
         sound1._loop = None
-        sound1._volume = None
+        sound1.volume = None
         sound1.status.return_value = STATUS.PLAYING
         sound1.stop = MagicMock()
 
         sound2 = MagicMock()
         sound2._loop = None
-        sound2._volume = None
+        sound2.volume = None
         sound2.status.return_value = STATUS.PLAYING
         sound2.stop = MagicMock()
 

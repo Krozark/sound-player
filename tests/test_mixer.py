@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from sound_player.core.audio_config import AudioConfig
-from sound_player.core.state import STATUS
+from sound_player.core.mixins import STATUS
 from sound_player.mixer import AudioMixer
 
 
@@ -57,7 +57,8 @@ class MockSound:
     def get_channels(self):
         return 2
 
-    def get_audio_config(self):
+    @property
+    def config(self):
         return AudioConfig()
 
     def status(self):

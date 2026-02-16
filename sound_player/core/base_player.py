@@ -5,15 +5,13 @@ the interface for platform-specific audio output implementations.
 """
 
 import logging
-import threading
 from abc import ABC, abstractmethod
 
 import numpy as np
 
 from sound_player.audiolayer import AudioLayer
 
-from .audio_config import AudioConfig
-from .state import STATUS, StatusObject
+from .mixins import STATUS, AudioConfigMixin, StatusMixin
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +20,7 @@ __all__ = [
 ]
 
 
-class BaseSoundPlayer(StatusObject, ABC):
+class BaseSoundPlayer(StatusMixin, AudioConfigMixin, ABC):
     """Base class for platform-specific audio output.
 
     The BaseSoundPlayer:
@@ -35,40 +33,14 @@ class BaseSoundPlayer(StatusObject, ABC):
     - _close_output_stream(): Close/release the audio output stream
     """
 
-    def __init__(self, config: AudioConfig | None = None):
+    def __init__(self, *args, **kwargs):
         """Initialize the BaseSoundPlayer.
 
         Args:
             config: AudioConfig for audio output format
         """
-        super().__init__()
-        self._config = config or AudioConfig()
+        super().__init__(*args, **kwargs)
         self._audio_layers: dict[str, AudioLayer] = {}
-        self._lock = threading.RLock()
-        self._volume = 1.0
-
-    @property
-    def config(self) -> AudioConfig:
-        """Get the audio configuration."""
-        return self._config
-
-    def set_volume(self, volume: float) -> None:
-        """Set the master volume.
-
-        Args:
-            volume: Volume (0.0-1.0)
-        """
-        logger.debug("BaseSoundPlayer.set_volume(%s)", volume)
-        with self._lock:
-            self._volume = max(0.0, min(1.0, volume))
-
-    def get_volume(self) -> float:
-        """Get the master volume.
-
-        Returns:
-            Volume (0.0-1.0)
-        """
-        return self._volume
 
     def create_audio_layer(self, layer, force=False, *args, **kwargs):
         """Create a new audio layer.
@@ -88,7 +60,7 @@ class BaseSoundPlayer(StatusObject, ABC):
 
             # Pass config to AudioLayer if not provided
             if "config" not in kwargs:
-                kwargs["config"] = self._config
+                kwargs["config"] = self.config
             self._audio_layers[layer] = AudioLayer(*args, **kwargs)
 
     def enqueue(self, sound, layer):
@@ -183,30 +155,31 @@ class BaseSoundPlayer(StatusObject, ABC):
 
         if not active_layers:
             return np.zeros(
-                (self._config.buffer_size, self._config.channels),
-                dtype=self._config.dtype,
+                (self.config.buffer_size, self.config.channels),
+                dtype=self.config.dtype,
             )
 
         # Mix all active layers
         mixed = np.zeros(
-            (self._config.buffer_size, self._config.channels),
+            (self.config.buffer_size, self.config.channels),
             dtype=np.float32,
         )
 
         for layer in active_layers:
             chunk = layer.get_next_chunk()
             if chunk is not None and chunk.size > 0:
-                mixed += chunk.astype(np.float32)
+                # Layer volume already applied by AudioLayer.mixer
+                # Apply player volume
+                mixed += chunk.astype(np.float32) * self.volume
 
-        # Apply volume and clip
-        mixed *= self._volume
+        # Clip
         mixed = np.clip(
             mixed,
-            self._config.min_sample_value,
-            self._config.max_sample_value,
+            self.config.min_sample_value,
+            self.config.max_sample_value,
         )
 
-        return mixed.astype(self._config.dtype)
+        return mixed.astype(self.config.dtype)
 
     @abstractmethod
     def _create_output_stream(self):

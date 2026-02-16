@@ -3,13 +3,13 @@
 import pytest
 
 from sound_player.core.base_sound import BaseSound
-from sound_player.core.state import STATUS
+from sound_player.core.mixins import STATUS
 
 
 class MockSound(BaseSound):
     """Mock implementation of BaseSound for testing."""
 
-    def __init__(self, filepath, config=None, loop=None, volume=None):
+    def __init__(self, filepath, config=None, loop=None, volume=1.0):
         super().__init__(filepath, config, loop, volume)
         self.do_play_called = False
         self.do_pause_called = False
@@ -33,7 +33,7 @@ class TestBaseSoundInit:
         sound = MockSound("test.ogg")
         assert sound._filepath == "test.ogg"
         assert sound._loop is None
-        assert sound._volume is None
+        assert sound._volume == 1.0
         assert sound.status() == STATUS.STOPPED
 
     def test_initialization_with_loop(self):

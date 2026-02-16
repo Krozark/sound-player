@@ -2,7 +2,7 @@
 
 import pytest
 
-from sound_player.core.state import STATUS
+from sound_player.core.mixins import STATUS
 from sound_player.platform.linux.player import LinuxSoundPlayer
 
 

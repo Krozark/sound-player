@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from sound_player.core.audio_config import AudioConfig
-from sound_player.core.state import STATUS
+from sound_player.core.mixins import STATUS
 from sound_player.platform.linux import LinuxPCMSound
 
 
@@ -57,7 +57,7 @@ class TestLinuxPCMSound:
 
     def test_get_audio_config(self, linux_sound, audio_config):
         """Test get_audio_config returns correct config."""
-        assert linux_sound.get_audio_config() is audio_config
+        assert linux_sound.config is audio_config
 
     def test_get_sample_rate(self, linux_sound, audio_config):
         """Test get_sample_rate returns correct rate."""

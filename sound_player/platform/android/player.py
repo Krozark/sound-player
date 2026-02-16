@@ -208,14 +208,6 @@ class AndroidSoundPlayer(BaseSoundPlayer):
                         audio_layer.play()
                 super().play()
 
-                # Create AudioTrack if needed and start playback
-                if self._audiotrack is None:
-                    self._create_output_stream()
-
-                if self._audiotrack:
-                    self._audiotrack.play()
-                    self._start_output_thread()
-
     def pause(self, layer=None):
         """Pause playback of a layer or all layers.
 
@@ -236,10 +228,6 @@ class AndroidSoundPlayer(BaseSoundPlayer):
                         audio_layer.pause()
                 super().pause()
 
-                # Pause the AudioTrack
-                if self._audiotrack:
-                    self._audiotrack.pause()
-
     def stop(self, layer=None):
         """Stop playback of a layer or all layers.
 
@@ -255,14 +243,34 @@ class AndroidSoundPlayer(BaseSoundPlayer):
                 # Stop specific layer only
                 return self._audio_layers[layer].stop()
             else:
-                # Stop all layers and close output
+                # Stop all layers and close output stream
                 for audio_layer in self._audio_layers.values():
                     audio_layer.stop()
                 super().stop()
 
-                # Stop output thread and close AudioTrack
-                self._stop_output_thread()
-                self._close_output_stream()
+    # Hooks for StatusMixin
+
+    def _do_play(self):
+        """Hook called when play status changes to PLAYING."""
+        # Create AudioTrack if needed and start playback
+        if self._audiotrack is None:
+            self._create_output_stream()
+
+        if self._audiotrack:
+            self._audiotrack.play()
+            self._start_output_thread()
+
+    def _do_pause(self):
+        """Hook called when play status changes to PAUSED."""
+        # Pause the AudioTrack
+        if self._audiotrack:
+            self._audiotrack.pause()
+
+    def _do_stop(self):
+        """Hook called when play status changes to STOPPED."""
+        # Stop output thread and close AudioTrack
+        self._stop_output_thread()
+        self._close_output_stream()
 
     def __del__(self):
         """Cleanup on deletion."""

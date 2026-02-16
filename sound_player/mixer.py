@@ -5,13 +5,12 @@ of multiple audio streams with support for volume control at multiple levels.
 """
 
 import logging
-import threading
 
 import numpy as np
 
 from .core.audio_config import AudioConfig
 from .core.base_sound import BaseSound
-from .core.state import STATUS
+from .core.mixins import STATUS, LockMixin
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +19,7 @@ __all__ = [
 ]
 
 
-class AudioMixer:
+class AudioMixer(LockMixin):
     """Mixes multiple audio streams into a single output buffer.
 
     The mixer handles:
@@ -32,36 +31,19 @@ class AudioMixer:
     Volume hierarchy: final = (sound1 * vol1 + sound2 * vol2 + ...) * master_volume
     """
 
-    def __init__(self, config: AudioConfig, volume: float = 1.0):
-        """Initialize the AudioMixer.
-
-        Args:
-            config: AudioConfig defining the audio format
-            volume: Master volume (0.0 to 1.0)
-        """
-        self._config = config
-        self._volume = max(0.0, min(1.0, volume))
+    def __init__(self, owner):
+        super().__init__()
+        self._owner = owner
         self._sounds: list[BaseSound] = []
-        self._lock = threading.RLock()
 
     @property
     def config(self) -> AudioConfig:
         """Get the audio configuration."""
-        return self._config
+        return self._owner.config
 
     @property
     def volume(self) -> float:
-        """Get the master volume."""
-        return self._volume
-
-    def set_volume(self, volume: float) -> None:
-        """Set the master volume.
-
-        Args:
-            volume: Master volume (0.0 to 1.0)
-        """
-        with self._lock:
-            self._volume = max(0.0, min(1.0, volume))
+        return self._owner.volume
 
     @property
     def sound_count(self) -> int:
@@ -125,25 +107,24 @@ class AudioMixer:
             return self._get_silence()
 
         # Initialize output buffer with zeros
-        mixed = np.zeros((self._config.buffer_size, self._config.channels), dtype=np.float32)
+        mixed = np.zeros((self.config.buffer_size, self.config.channels), dtype=np.float32)
 
         for sound in active_sounds:
             try:
-                chunk = sound.get_next_chunk(self._config.buffer_size)
+                chunk = sound.get_next_chunk(self.config.buffer_size)
                 if chunk is None or chunk.size == 0:
                     continue
 
                 # Apply individual sound volume (0.0-1.0)
-                sound_volume = sound._volume if sound._volume is not None else 1.0
-                chunk_float = chunk.astype(np.float32) * sound_volume
+                chunk_float = chunk.astype(np.float32) * sound.volume
 
                 # Handle channel mismatch
-                if chunk_float.shape[1] != self._config.channels:
-                    chunk_float = self._convert_channels(chunk_float, self._config.channels)
+                if chunk_float.shape[1] != self.config.channels:
+                    chunk_float = self._convert_channels(chunk_float, self.config.channels)
 
                 # Ensure chunk size matches buffer size
-                if chunk_float.shape[0] != self._config.buffer_size:
-                    chunk_float = self._adjust_length(chunk_float, self._config.buffer_size)
+                if chunk_float.shape[0] != self.config.buffer_size:
+                    chunk_float = self._adjust_length(chunk_float, self.config.buffer_size)
 
                 mixed += chunk_float
 
@@ -152,15 +133,15 @@ class AudioMixer:
                 continue
 
         # Apply master volume and clip to prevent overflow
-        mixed *= self._volume
+        mixed *= self.volume
         mixed = np.clip(
             mixed,
-            self._config.min_sample_value,
-            self._config.max_sample_value,
+            self.config.min_sample_value,
+            self.config.max_sample_value,
         )
 
         # Convert back to target dtype
-        return mixed.astype(self._config.dtype)
+        return mixed.astype(self.config.dtype)
 
     def _get_silence(self) -> np.ndarray:
         """Get a silent buffer.
@@ -169,8 +150,8 @@ class AudioMixer:
             Silent audio buffer
         """
         return np.zeros(
-            (self._config.buffer_size, self._config.channels),
-            dtype=self._config.dtype,
+            (self.config.buffer_size, self.config.channels),
+            dtype=self.config.dtype,
         )
 
     def _convert_channels(self, chunk: np.ndarray, target_channels: int) -> np.ndarray:

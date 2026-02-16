@@ -13,7 +13,6 @@ import logging
 import numpy as np
 import soundfile as sf
 
-from sound_player.core import AudioConfig
 from sound_player.core.base_sound import BaseSound
 
 logger = logging.getLogger(__name__)
@@ -35,7 +34,7 @@ class LinuxPCMSound(BaseSound):
     sounddevice or any other audio output library.
     """
 
-    def __init__(self, filepath, config: AudioConfig | None = None, loop=None, volume=None):
+    def __init__(self, *args, **kwargs):
         """Initialize the LinuxPCMSound.
 
         Args:
@@ -44,10 +43,10 @@ class LinuxPCMSound(BaseSound):
             loop: Number of times to loop (-1 for infinite)
             volume: Volume level (0-100)
         """
-        super().__init__(filepath, config, loop, volume)
+        super().__init__(*args, **kwargs)
 
         # Audio file info
-        self._file_info = sf.info(filepath)
+        self._file_info = sf.info(self._filepath)
         self._file_sample_rate = self._file_info.samplerate
         self._file_channels = self._file_info.channels
 
