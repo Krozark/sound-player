@@ -122,11 +122,11 @@ class TestLinuxPCMSound:
 
     def test_volume_configuration(self, mock_audio_file, audio_config):
         """Test volume configuration."""
-        sound = LinuxPCMSound(mock_audio_file, config=audio_config, volume=50)
-        assert sound._volume == 50
+        sound = LinuxPCMSound(mock_audio_file, config=audio_config, volume=0.5)
+        assert sound._volume == 0.5
 
-        sound.set_volume(75)
-        assert sound._volume == 75
+        sound.set_volume(0.75)
+        assert sound._volume == 0.75
 
     def test_seek(self, mock_audio_file, audio_config):
         """Test seek functionality."""

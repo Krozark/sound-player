@@ -8,9 +8,30 @@ This example demonstrates:
 5. Loop functionality
 """
 
+import argparse
+import logging
 import time
 
 from sound_player import AudioConfig, AudioLayer, Sound, SoundPlayer
+
+
+def setup_logging(verbosity: int = 0):
+    """Setup logging for the example.
+
+    Args:
+        verbosity: Logging level (0=WARNING, 1=INFO, 2=DEBUG)
+    """
+    level = logging.WARNING
+    if verbosity >= 1:
+        level = logging.INFO
+    if verbosity >= 2:
+        level = logging.DEBUG
+
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%H:%M:%S",
+    )
 
 
 def test_basic_sound():
@@ -98,11 +119,11 @@ def test_sound_player_multiple_layers():
     player = SoundPlayer()
 
     # Create a music layer with background music
-    player.create_audio_layer("music", concurrency=1, volume=70)
+    player.create_audio_layer("music", concurrency=1, volume=0.7)
     player["music"].enqueue(Sound("data/music.ogg"))
 
     # Create a sound effects layer
-    player.create_audio_layer("sfx", concurrency=1, volume=100)
+    player.create_audio_layer("sfx", concurrency=1, volume=1.0)
     player["sfx"].enqueue(Sound("data/coin.wav"))
     player["sfx"].enqueue(Sound("data/coin.wav"))
 
@@ -133,24 +154,22 @@ def test_volume_controls():
     player = SoundPlayer()
 
     # Create layers with different volumes
-    player.create_audio_layer("music", volume=50)  # 50% volume
-    player.create_audio_layer("sfx", volume=100)  # 100% volume
+    player.create_audio_layer("music", volume=1)  # 100% volume
 
     player["music"].enqueue(Sound("data/music.ogg"))
-    player["sfx"].enqueue(Sound("data/coin.wav"))
 
-    print("Playing with music at 50% volume...")
+    print("Playing with music at 100% volume...")
     player.play()
     time.sleep(3)
 
     # Change layer volume
-    print("Increasing music volume to 80%...")
-    player["music"].set_volume(80)
+    print("setting volume to 50%...")
+    player.set_volume(0.5)
     time.sleep(2)
 
     # Change master volume
-    print("Setting master volume to 50%...")
-    player.set_volume(0.5)
+    print("Setting volume to 20%...")
+    player.set_volume(0.2)
     time.sleep(2)
 
     player.stop()
@@ -199,7 +218,7 @@ def test_audio_configuration():
     )
 
     player = SoundPlayer(config=config)
-    player.create_audio_layer("music", config=config, volume=80)
+    player.create_audio_layer("music", config=config, volume=0.8)
     player["music"].enqueue(Sound("data/music.ogg"))
 
     print(f"Playing with config: {config.sample_rate}Hz, {config.channels}ch...")
@@ -210,8 +229,13 @@ def test_audio_configuration():
     time.sleep(1)
 
 
-def main():
-    """Run all examples."""
+def main(verbosity: int = 0):
+    """Run all examples.
+
+    Args:
+        verbosity: Logging level (0=WARNING, 1=INFO, 2=DEBUG)
+    """
+    setup_logging(verbosity)
     print("\n" + "=" * 50)
     print("SOUND PLAYER LIBRARY - EXAMPLES")
     print("=" * 50)
@@ -220,8 +244,8 @@ def main():
     # test_audio_layer_concurrency()
     # test_audio_layer_replace_mode()
     # test_sound_player_multiple_layers()
-    test_volume_controls()
-    # test_loop_functionality()
+    # test_volume_controls()
+    test_loop_functionality()
     # test_audio_configuration()
 
     print("\n" + "=" * 50)
@@ -230,4 +254,18 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(
+        description="Sound Player Library - Examples",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "-v",
+        "--verbosity",
+        type=int,
+        default=0,
+        choices=[0, 1, 2],
+        help="Logging verbosity: 0=WARNING (default), 1=INFO, 2=DEBUG",
+    )
+
+    args = parser.parse_args()
+    main(args.verbosity)

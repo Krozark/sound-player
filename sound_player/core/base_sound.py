@@ -30,7 +30,7 @@ class BaseSound(StatusObject):
         with self._lock:
             self._loop = loop
 
-    def set_volume(self, volume: int):
+    def set_volume(self, volume: float):
         logger.debug("BaseSound.set_volume(%s)", volume)
         with self._lock:
             self._volume = volume
@@ -91,8 +91,6 @@ class BaseSound(StatusObject):
             Audio data as numpy array with shape (size, channels)
             Returns None if sound has ended or is not playing
         """
-        logger.debug("BaseSound.get_next_chunk(%s)", size)
-
         with self._lock:
             if self._status in (STATUS.STOPPED, STATUS.PAUSED):
                 return None

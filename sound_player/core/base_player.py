@@ -53,20 +53,20 @@ class BaseSoundPlayer(StatusObject, ABC):
         return self._config
 
     def set_volume(self, volume: float) -> None:
-        """Set the volume.
+        """Set the master volume.
 
         Args:
-            volume: Volume (0.0 to 1.0)
+            volume: Volume (0.0-1.0)
         """
         logger.debug("BaseSoundPlayer.set_volume(%s)", volume)
         with self._lock:
             self._volume = max(0.0, min(1.0, volume))
 
     def get_volume(self) -> float:
-        """Get the volume.
+        """Get the master volume.
 
         Returns:
-            Volume (0.0 to 1.0)
+            Volume (0.0-1.0)
         """
         return self._volume
 

@@ -32,7 +32,7 @@ def mixer(audio_config):
 class MockSound:
     """Mock sound class for testing."""
 
-    def __init__(self, data, status=STATUS.PLAYING, volume=100):
+    def __init__(self, data, status=STATUS.PLAYING, volume=1.0):
         self._data = data
         self._status = status
         self._volume = volume
@@ -190,7 +190,7 @@ class TestAudioMixer:
     def test_volume_application(self, mixer, audio_config):
         """Test that sound volume is applied correctly."""
         data = np.full((audio_config.buffer_size, 2), 1000, dtype=np.int16)
-        sound = MockSound(data, volume=50)  # 50% volume
+        sound = MockSound(data, volume=0.5)  # 50% volume
 
         mixer.add_sound(sound)
         chunk = mixer.get_next_chunk()

@@ -133,8 +133,8 @@ class AudioMixer:
                 if chunk is None or chunk.size == 0:
                     continue
 
-                # Apply individual sound volume (convert 0-100 to 0.0-1.0)
-                sound_volume = sound._volume / 100.0 if sound._volume is not None else 1.0
+                # Apply individual sound volume (0.0-1.0)
+                sound_volume = sound._volume if sound._volume is not None else 1.0
                 chunk_float = chunk.astype(np.float32) * sound_volume
 
                 # Handle channel mismatch

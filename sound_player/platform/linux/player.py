@@ -4,7 +4,6 @@ This module provides the LinuxSoundPlayer class which implements audio
 output on Linux using the sounddevice library.
 """
 
-import contextlib
 import logging
 import threading
 
@@ -102,13 +101,9 @@ class LinuxSoundPlayer(BaseSoundPlayer):
         logger.debug("Closing sounddevice stream")
         with self._lock:
             if self._stream:
-                try:
-                    if self._stream.active:
-                        self._stream.stop()
-                except Exception:
-                    pass  # Ignore errors during cleanup
-                with contextlib.suppress(Exception):
-                    self._stream.close()
+                if self._stream.active:
+                    self._stream.stop()
+                self._stream.close()
                 self._stream = None
 
     def play(self, layer=None):

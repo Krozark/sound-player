@@ -28,25 +28,25 @@ class AudioLayer(StatusObject):
     - concurrency: Maximum number of sounds playing simultaneously
     - replace: If True, stops old sounds when adding new ones beyond concurrency limit
     - loop: How many times sounds should be played (-1 = infinite, N = finite)
-    - volume: Layer-level volume (0-100)
+    - volume: Layer-level volume (0.0-1.0)
     - mixer: AudioMixer for mixing current sounds together
     """
 
-    def __init__(self, concurrency=1, replace=False, loop=None, volume=100, config: AudioConfig | None = None):
+    def __init__(self, concurrency=1, replace=False, loop=None, volume=1.0, config: AudioConfig | None = None):
         """Initialize the AudioLayer.
 
         Args:
             concurrency: Maximum number of sounds playing simultaneously
             replace: If True, stop old sounds when limit is exceeded
             loop: Default loop count for sounds (-1 = infinite)
-            volume: Layer volume (0-100)
+            volume: Layer volume (0.0-1.0)
             config: AudioConfig for the mixer
         """
         super().__init__()
         self._concurrency = concurrency
         self._replace_on_add = replace
         self._loop = loop
-        self._volume = volume
+        self._volume = max(0.0, min(1.0, volume))
         self._config = config or AudioConfig()
         self._queue_waiting = []
         self._queue_current = []
@@ -54,7 +54,7 @@ class AudioLayer(StatusObject):
         self._lock = threading.RLock()
 
         # Create mixer for this layer
-        self._mixer: AudioMixer = AudioMixer(self._config, volume / 100.0)
+        self._mixer: AudioMixer = AudioMixer(self._config, self._volume)
 
     @property
     def config(self) -> AudioConfig:
@@ -96,16 +96,16 @@ class AudioLayer(StatusObject):
         with self._lock:
             self._loop = loop
 
-    def set_volume(self, volume):
+    def set_volume(self, volume: float):
         """Set the layer volume.
 
         Args:
-            volume: Volume level (0-100)
+            volume: Volume level (0.0-1.0)
         """
         logger.debug("AudioLayer.set_volume(%s)", volume)
         with self._lock:
             self._volume = volume
-            self._mixer.set_volume(volume / 100.0)
+            self._mixer.set_volume(volume)
 
     def enqueue(self, sound):
         """Add a sound to the waiting queue.

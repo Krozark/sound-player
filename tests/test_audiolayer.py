@@ -16,7 +16,7 @@ class TestAudioLayerInit:
         assert layer._concurrency == 1
         assert layer._replace_on_add is False
         assert layer._loop is None
-        assert layer._volume == 100
+        assert layer._volume == 1.0
         assert layer._queue_waiting == []
         assert layer._queue_current == []
         assert layer._thread is None
@@ -24,11 +24,11 @@ class TestAudioLayerInit:
 
     def test_initialization_with_parameters(self):
         """Test AudioLayer with custom parameters."""
-        layer = AudioLayer(concurrency=3, replace=True, loop=5, volume=50)
+        layer = AudioLayer(concurrency=3, replace=True, loop=5, volume=0.5)
         assert layer._concurrency == 3
         assert layer._replace_on_add is True
         assert layer._loop == 5
-        assert layer._volume == 50
+        assert layer._volume == 0.5
 
 
 class TestAudioLayerSetters:
@@ -55,8 +55,8 @@ class TestAudioLayerSetters:
     def test_set_volume(self):
         """Test set_volume method."""
         layer = AudioLayer()
-        layer.set_volume(75)
-        assert layer._volume == 75
+        layer.set_volume(0.75)
+        assert layer._volume == 0.75
 
 
 class TestAudioLayerEnqueue:
@@ -87,16 +87,16 @@ class TestAudioLayerEnqueue:
     def test_enqueue_applies_volume_from_sound(self, mock_sound):
         """Test that enqueue applies volume from sound if set."""
         layer = AudioLayer()
-        sound = mock_sound(volume=60)
+        sound = mock_sound(volume=0.6)
         layer.enqueue(sound)
-        sound.set_volume.assert_called_once_with(60)
+        sound.set_volume.assert_called_once_with(0.6)
 
     def test_enqueue_applies_volume_from_layer(self, mock_sound):
         """Test that enqueue applies volume from layer if sound volume not set."""
-        layer = AudioLayer(volume=80)
+        layer = AudioLayer(volume=0.8)
         sound = mock_sound(volume=None)
         layer.enqueue(sound)
-        sound.set_volume.assert_called_once_with(80)
+        sound.set_volume.assert_called_once_with(0.8)
 
     def test_enqueue_multiple_sounds(self, mock_sound):
         """Test enqueueing multiple sounds."""

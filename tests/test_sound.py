@@ -43,15 +43,15 @@ class TestBaseSoundInit:
 
     def test_initialization_with_volume(self):
         """Test BaseSound with volume parameter."""
-        sound = MockSound("test.ogg", volume=75)
-        assert sound._volume == 75
+        sound = MockSound("test.ogg", volume=0.75)
+        assert sound._volume == 0.75
 
     def test_initialization_with_all_parameters(self):
         """Test BaseSound with all parameters."""
-        sound = MockSound("test.ogg", loop=-1, volume=50)
+        sound = MockSound("test.ogg", loop=-1, volume=0.5)
         assert sound._filepath == "test.ogg"
         assert sound._loop == -1
-        assert sound._volume == 50
+        assert sound._volume == 0.5
 
 
 class TestBaseSoundSetLoop:
@@ -82,20 +82,20 @@ class TestBaseSoundSetVolume:
     def test_set_volume(self):
         """Test set_volume updates the volume value."""
         sound = MockSound("test.ogg")
-        sound.set_volume(80)
-        assert sound._volume == 80
+        sound.set_volume(0.8)
+        assert sound._volume == 0.8
 
     def test_set_volume_zero(self):
-        """Test set_volume with 0 (mute)."""
+        """Test set_volume with 0.0 (mute)."""
         sound = MockSound("test.ogg")
-        sound.set_volume(0)
-        assert sound._volume == 0
+        sound.set_volume(0.0)
+        assert sound._volume == 0.0
 
     def test_set_volume_max(self):
-        """Test set_volume with 100 (max)."""
+        """Test set_volume with 1.0 (max)."""
         sound = MockSound("test.ogg")
-        sound.set_volume(100)
-        assert sound._volume == 100
+        sound.set_volume(1.0)
+        assert sound._volume == 1.0
 
 
 class TestBaseSoundPlay:
