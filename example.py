@@ -337,7 +337,8 @@ def test_crossfade():
         "ambience",
         concurrency=1,
         replace=True,
-        crossfade_duration=4.0,  # 4-second crossfade
+        fade_in_duration=4.0,  # 4-second crossfade
+        fade_out_duration=4.0,  # 4-second crossfade
         volume=0.8,
     )
 
@@ -345,22 +346,22 @@ def test_crossfade():
     night = Sound("data/night-ambience.wav")
     player["ambience"].enqueue(night)
     player.play()
-    time.sleep(6)
+    time.sleep(8)
 
     print("Crossfading to dark ship ambience (4 seconds)...")
     print("(The night sound fades out while the ship sound fades in)")
     dark_ship = Sound("data/dark-ship.wav")
     player["ambience"].enqueue(dark_ship)
-    time.sleep(10)
+    time.sleep(8)
 
     print("Crossfading back to night ambience (4 seconds)...")
     night2 = Sound("data/night-ambience.wav")
     player["ambience"].enqueue(night2)
-    time.sleep(10)
+    time.sleep(8)
 
     print("Fading out over 3 seconds...")
     night2.fade_out(duration=3.0)
-    time.sleep(4)
+    time.sleep(6)
 
     player.stop()
     time.sleep(1)

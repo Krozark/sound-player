@@ -16,8 +16,6 @@ class FadeState(IntEnum):
     NONE = 0
     FADING_IN = 1
     FADING_OUT = 2
-    CROSSFADE_OUT = 3  # Old sound fading out during crossfade
-    CROSSFADE_IN = 4  # New sound fading in during crossfade
 
 
 class FadeCurve(IntEnum):
@@ -88,41 +86,6 @@ class FadeMixin(VolumeMixin):
             self._fade_start_volume = self._volume
             self._fade_target_volume = max(0.0, min(1.0, target_volume))
 
-    def start_crossfade_out(self, duration: float) -> None:
-        """Start fading out for crossfade (will auto-stop when complete).
-
-        Args:
-            duration: Fade duration in seconds
-        """
-        logger.debug(f"start_crossfade_out(duration={duration})")
-        with self._lock:
-            if duration <= 0:
-                logger.debug("Fade duration <= 0, setting volume directly")
-                return
-            self._fade_state = FadeState.CROSSFADE_OUT
-            self._fade_start_time = time.time()
-            self._fade_duration = duration
-            self._fade_start_volume = self._volume
-            self._fade_target_volume = 0.0
-
-    def start_crossfade_in(self, duration: float, target_volume: float = 1.0) -> None:
-        """Start fading in for crossfade.
-
-        Args:
-            duration: Fade duration in seconds
-            target_volume: Target volume (0.0-1.0)
-        """
-        logger.debug(f"start_crossfade_in(duration={duration}, target_volume={target_volume})")
-        with self._lock:
-            if duration <= 0:
-                logger.debug("Fade duration <= 0, setting volume directly")
-                return
-            self._fade_state = FadeState.CROSSFADE_IN
-            self._fade_start_time = time.time()
-            self._fade_duration = duration
-            self._fade_start_volume = 0.0
-            self._fade_target_volume = max(0.0, min(1.0, target_volume))
-
     def get_fade_multiplier(self) -> float:
         """Get current fade multiplier based on elapsed time.
 
@@ -139,24 +102,19 @@ class FadeMixin(VolumeMixin):
             # Apply curve
             curved_progress = self._apply_curve(progress)
 
-            # Calculate multiplier based on fade type
-            if self._fade_state in (FadeState.FADING_IN, FadeState.CROSSFADE_IN):
+            # Calculate multiplier based on fade direction
+            if self._fade_state == FadeState.FADING_IN:
                 multiplier = (
                     self._fade_start_volume + (self._fade_target_volume - self._fade_start_volume) * curved_progress
                 )
-            else:  # FADING_OUT, CROSSFADE_OUT
+            else:  # FADING_OUT
                 multiplier = (
                     self._fade_start_volume + (self._fade_target_volume - self._fade_start_volume) * curved_progress
                 )
 
             # Check if fade is complete
             if progress >= 1.0:
-                if self._fade_state == FadeState.CROSSFADE_OUT:
-                    # Auto-stop on crossfade out completion
-                    self._fade_state = FadeState.NONE
-                    # Note: The actual stop should be handled by the caller
-                else:
-                    self._fade_state = FadeState.NONE
+                self._fade_state = FadeState.NONE
 
             return max(0.0, min(1.0, multiplier))
 
@@ -211,8 +169,6 @@ class FadeMixin(VolumeMixin):
 
     def fade_in(self, duration: float, target_volume: float = 1.0) -> None:
         """Start a fade-in from 0 to target_volume over duration seconds.
-
-        Convenience method that also ensures the sound is in a proper state.
 
         Args:
             duration: Fade duration in seconds

@@ -26,8 +26,6 @@ class TestFadeState:
         assert FadeState.NONE.value == 0
         assert FadeState.FADING_IN.value == 1
         assert FadeState.FADING_OUT.value == 2
-        assert FadeState.CROSSFADE_OUT.value == 3
-        assert FadeState.CROSSFADE_IN.value == 4
 
     def test_fade_state_equality(self):
         """Test FadeState enum equality."""
@@ -80,21 +78,6 @@ class TestFadeMixin:
         obj.set_volume(0.8)
         obj.start_fade_out(1.0, 0.0)
         assert obj.fade_state == FadeState.FADING_OUT
-        assert obj.is_fading()
-
-    def test_start_crossfade_out(self):
-        """Test starting a crossfade out."""
-        obj = ConcreteFadeMixin()
-        obj.set_volume(0.8)
-        obj.start_crossfade_out(1.0)
-        assert obj.fade_state == FadeState.CROSSFADE_OUT
-        assert obj.is_fading()
-
-    def test_start_crossfade_in(self):
-        """Test starting a crossfade in."""
-        obj = ConcreteFadeMixin()
-        obj.start_crossfade_in(1.0, 0.5)
-        assert obj.fade_state == FadeState.CROSSFADE_IN
         assert obj.is_fading()
 
     def test_fade_multiplier_no_fade(self):

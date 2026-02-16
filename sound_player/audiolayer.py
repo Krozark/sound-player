@@ -38,7 +38,6 @@ class AudioLayer(StatusMixin, AudioConfigMixin):
         loop=None,
         fade_in_duration=None,
         fade_out_duration=None,
-        crossfade_duration=None,
         *args,
         **kwargs,
     ):
@@ -49,8 +48,8 @@ class AudioLayer(StatusMixin, AudioConfigMixin):
             replace: If True, stop old sounds when limit is exceeded
             loop: Default loop count for sounds (-1 = infinite)
             fade_in_duration: Default fade-in duration for enqueued sounds (seconds)
-            fade_out_duration: Default fade-out duration for enqueued sounds (seconds)
-            crossfade_duration: Crossfade duration for replace mode (seconds)
+            fade_out_duration: Default fade-out duration for enqueued sounds (seconds),
+                                 also used for crossfade when replace=True
             volume: Layer volume (0.0-1.0)
             config: AudioConfig for the mixer
         """
@@ -60,7 +59,6 @@ class AudioLayer(StatusMixin, AudioConfigMixin):
         self._loop = loop
         self._fade_in_duration = fade_in_duration
         self._fade_out_duration = fade_out_duration
-        self._crossfade_duration = crossfade_duration
         self._queue_waiting = []
         self._queue_current = []
         self._fading_out_sounds = []  # Sounds fading out during crossfade
@@ -117,22 +115,14 @@ class AudioLayer(StatusMixin, AudioConfigMixin):
     def set_fade_out_duration(self, duration: float) -> None:
         """Set the default fade-out duration for enqueued sounds.
 
+        Also used for crossfade when replace=True.
+
         Args:
             duration: Fade-out duration in seconds (None to disable)
         """
         logger.debug("AudioLayer.set_fade_out_duration(%s)", duration)
         with self._lock:
             self._fade_out_duration = duration
-
-    def set_crossfade_duration(self, duration: float) -> None:
-        """Set the crossfade duration for replace mode.
-
-        Args:
-            duration: Crossfade duration in seconds (None to disable)
-        """
-        logger.debug("AudioLayer.set_crossfade_duration(%s)", duration)
-        with self._lock:
-            self._crossfade_duration = duration
 
     def enqueue(self, sound, fade_in=None, fade_out=None):
         """Add a sound to the waiting queue.
@@ -257,17 +247,17 @@ class AudioLayer(StatusMixin, AudioConfigMixin):
                             place_needed = len(self._queue_current) + len(self._queue_waiting) - self._concurrency
                             if place_needed > 0 and len(self._queue_current) > 0:
                                 # Check if we should use crossfade
-                                use_crossfade = self._crossfade_duration is not None and self._crossfade_duration > 0
+                                use_crossfade = self._fade_out_duration is not None and self._fade_out_duration > 0
 
                                 for i in range(0, min(len(self._queue_current), place_needed)):
                                     sound = self._queue_current[i]
                                     if use_crossfade:
-                                        # Start crossfade out
+                                        # Start fade out for crossfade
                                         logger.debug(
                                             "Crossfading out sound %s to add new one.",
                                             sound,
                                         )
-                                        sound.start_crossfade_out(self._crossfade_duration)
+                                        sound.start_fade_out(self._fade_out_duration)
                                         self._fading_out_sounds.append(sound)
                                     else:
                                         # Immediate stop
