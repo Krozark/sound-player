@@ -17,7 +17,7 @@ __all__ = [
 if platform == "linux":
     from .linux import LinuxPCMSound as Sound
 elif platform == "android":
-    from .android import Sound
+    from .android import AndroidPCMSound as Sound
 else:
     logger.critical("No implementation found for platform %s", platform)
     raise NotImplementedError(f"No implementation available for platform: {platform}")

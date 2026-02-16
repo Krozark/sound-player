@@ -10,10 +10,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .audio_config import AudioConfig
+from .core.audio_config import AudioConfig
 
 if TYPE_CHECKING:
-    from .sound import BaseSound
+    from .core.base_sound import BaseSound
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +105,7 @@ class AudioMixer:
         Returns:
             List of sounds that are in PLAYING status
         """
-        from .sound import STATUS
+        from .core.state import STATUS
 
         with self._lock:
             return [s for s in self._sounds if s.status() == STATUS.PLAYING]

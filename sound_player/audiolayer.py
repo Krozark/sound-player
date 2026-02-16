@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .audio_config import AudioConfig
-from .common import STATUS, StatusObject
+from .core.audio_config import AudioConfig
+from .core.state import STATUS, StatusObject
 
 if TYPE_CHECKING:
     from .mixer import AudioMixer

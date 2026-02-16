@@ -2,8 +2,8 @@
 
 import pytest
 
-from sound_player.common import STATUS
-from sound_player.sound import BaseSound
+from sound_player.core.base_sound import BaseSound
+from sound_player.core.state import STATUS
 
 
 class MockSound(BaseSound):

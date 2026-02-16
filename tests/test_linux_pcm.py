@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from sound_player.audio_config import AudioConfig
-from sound_player.common import STATUS
+from sound_player.core.audio_config import AudioConfig
+from sound_player.core.state import STATUS
 from sound_player.platform.linux import LinuxPCMSound
 
 
@@ -198,13 +198,6 @@ class TestLinuxPCMSound:
         linux_sound._loop_count = 2
         assert linux_sound._check_loop() is False
         assert linux_sound._loop_count == 3
-
-    def test_backward_compatibility_alias(self, mock_audio_file, audio_config):
-        """Test that LinuxSound alias exists."""
-        from sound_player.platform.linux import LinuxSound
-
-        sound = LinuxSound(mock_audio_file, config=audio_config)
-        assert isinstance(sound, LinuxPCMSound)
 
     def test_file_info_extraction(self, mock_audio_file, audio_config):
         """Test that file info is extracted correctly."""

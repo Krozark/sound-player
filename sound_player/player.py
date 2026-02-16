@@ -5,9 +5,9 @@ import threading
 
 import numpy as np
 
-from .audio_config import AudioConfig
 from .audiolayer import AudioLayer
-from .common import STATUS, StatusObject
+from .core.audio_config import AudioConfig
+from .core.state import STATUS, StatusObject
 
 logger = logging.getLogger(__name__)
 

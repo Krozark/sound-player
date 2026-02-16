@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from sound_player.common import STATUS, StatusObject
+from .state import STATUS, StatusObject
 
 if TYPE_CHECKING:
-    from sound_player.audio_config import AudioConfig
+    from .audio_config import AudioConfig
 
 logger = logging.getLogger(__name__)
 

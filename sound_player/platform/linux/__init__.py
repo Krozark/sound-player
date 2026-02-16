@@ -7,10 +7,4 @@ from .sound import LinuxPCMSound
 
 __all__ = [
     "LinuxPCMSound",
-    "LinuxSound",
-    "Sound",
 ]
-
-# For backward compatibility and direct access
-LinuxSound = LinuxPCMSound
-Sound = LinuxSound

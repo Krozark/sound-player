@@ -7,8 +7,8 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from sound_player.audio_config import AudioConfig
-from sound_player.common import STATUS
+from sound_player.core.audio_config import AudioConfig
+from sound_player.core.state import STATUS
 from sound_player.mixer import AudioMixer
 
 

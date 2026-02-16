@@ -4,7 +4,7 @@ import time
 from unittest.mock import MagicMock
 
 from sound_player.audiolayer import AudioLayer
-from sound_player.common import STATUS
+from sound_player.core.state import STATUS
 
 
 class TestAudioLayerInit:

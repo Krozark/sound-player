@@ -14,9 +14,7 @@ import threading
 import numpy as np
 import soundfile as sf
 
-from sound_player.audio_config import AudioConfig
-from sound_player.common import STATUS
-from sound_player.sound import BaseSound
+from sound_player.core import STATUS, AudioConfig, BaseSound
 
 logger = logging.getLogger(__name__)
 

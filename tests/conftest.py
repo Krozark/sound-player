@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from sound_player.common import STATUS
+from sound_player.core.state import STATUS
 
 
 @pytest.fixture

@@ -1,6 +1,6 @@
 """Tests for common.py - STATUS enum and StatusObject class."""
 
-from sound_player.common import STATUS, StatusObject
+from sound_player.core.state import STATUS, StatusObject
 
 
 class TestStatusEnum:
