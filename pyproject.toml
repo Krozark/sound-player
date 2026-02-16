@@ -4,15 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sound-player"
-version = "0.5.0"
-description = "The aim of this project is to create multi audio layer player"
+version = "1.0.0"
+description = "The aim of this project is to create multi audio layer player with professional audio mixing"
 readme = "README.md"
 license = {text = "BSD-2-Clause"}
 requires-python = ">=3.11"
 authors = [
     {name = "Maxime Barbier", email = "maxime.barbier1991+ava@gmail.com"},
 ]
-keywords = ["sound", "player", "audio"]
+keywords = ["sound", "player", "audio", "mixing", "pcm"]
 classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
@@ -20,12 +20,18 @@ classifiers = [
 ]
 dependencies = [
     "krozark-current-platform",
+    "numpy>=1.24",
+    "soundfile~=0.12",
 ]
 
 [project.optional-dependencies]
+linux = [
+    "sounddevice~=0.4",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
+    "pre-commit>=3.0",
 ]
 
 [project.urls]
