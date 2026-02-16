@@ -6,12 +6,12 @@ A Python library for playing multiple sound files with professional real-time au
 
 - **Real-time Audio Mixing** - Mix multiple audio streams simultaneously using NumPy
 - **Multiple Audio Layers** - Organize sounds into independent layers (music, SFX, voice, etc.)
-- **Volume Control** - Fine-grained volume at sound, layer, and master levels
+- **Volume Control** - Fine-grained volume at sound, layer, and master levels (all 0.0-1.0 float range)
 - **Concurrent Playback** - Configure how many sounds can play simultaneously per layer
 - **Loop Control** - Set sounds to loop infinitely or a specific number of times
 - **Replace Mode** - Optionally stop oldest sounds when concurrency limit is reached
 - **Cross-Platform** - Support for Linux, Android (Windows/macOS/iOS planned)
-- **PCM Buffer Interface** - Integrate with any audio output library
+- **Mixin Architecture** - Reusable mixins for status, volume, and configuration management
 
 ## Installation
 
@@ -41,11 +41,11 @@ from sound_player import Sound, SoundPlayer
 player = SoundPlayer()
 
 # Create a music layer with background music
-player.create_audio_layer("music", concurrency=1, volume=70)
+player.create_audio_layer("music", concurrency=1, volume=0.7)
 player["music"].enqueue(Sound("background_music.ogg"))
 
 # Create a sound effects layer
-player.create_audio_layer("sfx", concurrency=3, volume=100)
+player.create_audio_layer("sfx", concurrency=3, volume=1.0)
 player["sfx"].enqueue(Sound("coin.wav"))
 
 # Start playback
@@ -74,7 +74,7 @@ from sound_player import Sound
 
 sound = Sound("music.ogg")
 sound.set_loop(3)      # Play 3 times (use -1 for infinite)
-sound.set_volume(80)   # Set volume to 80%
+sound.set_volume(0.8)   # Set volume to 80% (0.0-1.0 range)
 
 sound.play()
 sound.wait()
@@ -86,7 +86,7 @@ sound.wait()
 from sound_player import AudioLayer, Sound
 
 # Allow up to 3 sounds playing at once
-layer = AudioLayer(concurrency=3, volume=80)
+layer = AudioLayer(concurrency=3, volume=0.8)
 
 layer.enqueue(Sound("music.ogg"))
 layer.enqueue(Sound("coin.wav"))
@@ -104,9 +104,9 @@ from sound_player import SoundPlayer, Sound
 player = SoundPlayer()
 
 # Create different audio layers
-player.create_audio_layer("music", concurrency=1, volume=60)
-player.create_audio_layer("sfx", concurrency=4, volume=100)
-player.create_audio_layer("voice", concurrency=1, volume=80)
+player.create_audio_layer("music", concurrency=1, volume=0.6)
+player.create_audio_layer("sfx", concurrency=4, volume=1.0)
+player.create_audio_layer("voice", concurrency=1, volume=0.8)
 
 # Add sounds to each layer
 player["music"].enqueue(Sound("background.ogg"))
@@ -125,7 +125,7 @@ player.stop()           # Stop all layers
 
 ### Volume Hierarchy
 
-The library supports volume control at three levels:
+The library supports volume control at three levels (all using 0.0-1.0 float range):
 
 ```python
 from sound_player import AudioConfig, AudioLayer, Sound, SoundPlayer
@@ -133,12 +133,12 @@ from sound_player import AudioConfig, AudioLayer, Sound, SoundPlayer
 player = SoundPlayer()
 player.set_volume(0.7)  # Master volume: 0.0 to 1.0
 
-layer = AudioLayer(volume=80)     # Layer volume: 0 to 100
+layer = AudioLayer(volume=0.8)     # Layer volume: 0.0 to 1.0
 sound = Sound("music.ogg")
-sound.set_volume(50)              # Sound volume: 0 to 100
+sound.set_volume(0.5)              # Sound volume: 0.0 to 1.0
 
 # Final volume = sound_vol × layer_vol × master_vol
-# Final = 0.50 × 0.80 × 0.70 = 0.28 (28%)
+# Final = 0.5 × 0.8 × 0.7 = 0.28 (28%)
 ```
 
 ### Custom Audio Configuration
@@ -175,6 +175,32 @@ layer.enqueue(Sound("sfx3.wav"))  # Stops sfx1.wav
 layer.play()
 ```
 
+## Architecture
+
+The library uses a mixin-based architecture with the following key components:
+
+### Core Classes
+
+- **`StatusMixin`** - Manages playback status (STOPPED, PLAYING, PAUSED) with thread-safe `play()`, `pause()`, `stop()` methods
+- **`VolumeMixin`** - Provides volume control with clamping (0.0-1.0) and thread-safe `set_volume()`, `get_volume()` methods
+- **`LockMixin`** - Provides thread-safe RLock for concurrent operations
+- **`AudioConfigMixin`** - Manages audio configuration (sample rate, channels, buffer size, etc.)
+
+### Main Classes
+
+- **`BaseSound`** - Base class for all sounds with PCM buffer interface
+- **`AudioLayer`** - Manages sound queues with mixing and concurrency control
+- **`BaseSoundPlayer`** - Abstract base class for platform-specific audio output
+- **`AudioMixer`** - Mixes multiple audio streams with volume control
+
+### Volume Hierarchy
+
+```
+sound_data × sound_volume × layer_volume × player_volume = final_output
+```
+
+Each level uses the 0.0-1.0 float range for consistent computations.
+
 ## API Reference
 
 ### SoundPlayer
@@ -189,6 +215,7 @@ Main class for managing multiple audio layers.
 | `pause(layer_id=None)` | Pause playback |
 | `stop(layer_id=None)` | Stop playback |
 | `set_volume(volume)` | Set master volume (0.0-1.0) |
+| `get_volume()` | Get master volume (0.0-1.0) |
 | `clear(layer_id=None)` | Clear queues |
 
 ### AudioLayer
@@ -197,7 +224,7 @@ Manages a queue of sounds with mixing.
 
 | Constructor | Description |
 |------------|-------------|
-| `AudioLayer(concurrency=1, replace=False, loop=None, volume=100, config=None)` | Create audio layer |
+| `AudioLayer(concurrency=1, replace=False, loop=None, volume=1.0, config=None)` | Create audio layer |
 
 | Method | Description |
 |--------|-------------|
@@ -207,7 +234,8 @@ Manages a queue of sounds with mixing.
 | `set_concurrency(n)` | Set max concurrent sounds |
 | `set_replace(bool)` | Enable/disable replace mode |
 | `set_loop(n)` | Set default loop count (-1=infinite) |
-| `set_volume(n)` | Set layer volume (0-100) |
+| `set_volume(v)` | Set layer volume (0.0-1.0) |
+| `get_volume()` | Get layer volume (0.0-1.0) |
 
 ### Sound
 
@@ -218,7 +246,8 @@ Represents a single sound file.
 | `play()` / `pause()` / `stop()` | Control playback |
 | `wait(timeout=None)` | Wait for playback to finish |
 | `set_loop(n)` | Set loop count (-1=infinite) |
-| `set_volume(n)` | Set volume (0-100) |
+| `set_volume(v)` | Set volume (0.0-1.0) |
+| `get_volume()` | Get volume (0.0-1.0) |
 | `seek(position)` | Seek to position (seconds) |
 
 ### AudioConfig

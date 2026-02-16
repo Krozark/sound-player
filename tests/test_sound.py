@@ -10,7 +10,10 @@ class MockSound(BaseSound):
     """Mock implementation of BaseSound for testing."""
 
     def __init__(self, filepath, config=None, loop=None, volume=1.0):
-        super().__init__(filepath, config, loop, volume)
+        # BaseSound.__init__ is (filepath, loop=None, *args, **kwargs)
+        # So we need to pass loop as positional arg after filepath
+        # config and volume go in **kwargs to avoid passing volume twice
+        super().__init__(filepath, loop, config=config, volume=volume)
         self.do_play_called = False
         self.do_pause_called = False
         self.do_stop_called = False

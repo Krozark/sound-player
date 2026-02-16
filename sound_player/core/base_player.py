@@ -97,6 +97,64 @@ class BaseSoundPlayer(StatusMixin, AudioConfigMixin, ABC):
             return self._audio_layers[layer].status()
         return super().status()
 
+    def play(self, layer=None, *args, **kwargs):
+        """Start playback of a layer or all layers.
+
+        Args:
+            layer: Specific layer to play, or None for all layers
+
+        For the player (layer=None), this also starts the audio output stream.
+        """
+        logger.debug("BasePlayer.play(%s)", layer)
+        with self._lock:
+            if layer is not None:
+                # Play specific layer only
+                return self._audio_layers[layer].play()
+            else:
+                # Play all layers and start output stream
+                for audio_layer in self._audio_layers.values():
+                    audio_layer.play()
+                super().play(*args, **kwargs)
+
+    def pause(self, layer=None):
+        """Pause playback of a layer or all layers.
+
+        Args:
+            layer: Specific layer to pause, or None for all layers
+
+        For the player (layer=None), this also pauses the AudioTrack.
+        """
+        logger.debug("BasePlayer.pause(%s)", layer)
+        with self._lock:
+            if layer is not None:
+                # Pause specific layer only
+                return self._audio_layers[layer].pause()
+            else:
+                # Pause all layers and pause AudioTrack
+                for audio_layer in self._audio_layers.values():
+                    audio_layer.pause()
+                super().pause()
+
+    def stop(self, layer=None):
+        """Stop playback of a layer or all layers.
+
+        Args:
+            layer: Specific layer to stop, or None for all layers
+
+        For the player (layer=None), this also stops the AudioTrack and
+        closes the output stream.
+        """
+        logger.debug("BasePlayer.stop(%s)", layer)
+        with self._lock:
+            if layer is not None:
+                # Stop specific layer only
+                return self._audio_layers[layer].stop()
+            else:
+                # Stop all layers and close output stream
+                for audio_layer in self._audio_layers.values():
+                    audio_layer.stop()
+                super().stop()
+
     def get_audio_layers(self):
         """Get all audio layer names.
 

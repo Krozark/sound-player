@@ -137,7 +137,7 @@ class AudioLayer(StatusMixin, AudioConfigMixin):
 
     def _do_stop(self):
         """Hook called when play status changes to STOPPED."""
-        pass  # clear() is called before super().stop() in our override
+        self.clear()
 
     def get_next_chunk(self) -> np.ndarray:
         """Get the next mixed audio chunk from this layer.

@@ -188,68 +188,7 @@ class AndroidSoundPlayer(BaseSoundPlayer):
                 finally:
                     self._audiotrack = None
 
-    def play(self, layer=None):
-        """Start playback of a layer or all layers.
-
-        Args:
-            layer: Specific layer to play, or None for all layers
-
-        For the player (layer=None), this also starts the audio output.
-        """
-        logger.debug("AndroidSoundPlayer.play(%s)", layer)
-        with self._lock:
-            if layer is not None:
-                # Play specific layer only
-                return self._audio_layers[layer].play()
-            else:
-                # Play all layers and start output
-                for audio_layer in self._audio_layers.values():
-                    if audio_layer.status() != STATUS.PLAYING:
-                        audio_layer.play()
-                super().play()
-
-    def pause(self, layer=None):
-        """Pause playback of a layer or all layers.
-
-        Args:
-            layer: Specific layer to pause, or None for all layers
-
-        For the player (layer=None), this also pauses the AudioTrack.
-        """
-        logger.debug("AndroidSoundPlayer.pause(%s)", layer)
-        with self._lock:
-            if layer is not None:
-                # Pause specific layer only
-                return self._audio_layers[layer].pause()
-            else:
-                # Pause all layers and pause AudioTrack
-                for audio_layer in self._audio_layers.values():
-                    if audio_layer.status() != STATUS.PAUSED:
-                        audio_layer.pause()
-                super().pause()
-
-    def stop(self, layer=None):
-        """Stop playback of a layer or all layers.
-
-        Args:
-            layer: Specific layer to stop, or None for all layers
-
-        For the player (layer=None), this also stops the AudioTrack and
-        closes the output stream.
-        """
-        logger.debug("AndroidSoundPlayer.stop(%s)", layer)
-        with self._lock:
-            if layer is not None:
-                # Stop specific layer only
-                return self._audio_layers[layer].stop()
-            else:
-                # Stop all layers and close output stream
-                for audio_layer in self._audio_layers.values():
-                    audio_layer.stop()
-                super().stop()
-
     # Hooks for StatusMixin
-
     def _do_play(self):
         """Hook called when play status changes to PLAYING."""
         # Create AudioTrack if needed and start playback

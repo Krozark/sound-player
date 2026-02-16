@@ -6,7 +6,6 @@ output on Linux using the sounddevice library.
 
 import logging
 
-from sound_player.core import STATUS
 from sound_player.core.base_player import BaseSoundPlayer
 
 try:
@@ -104,65 +103,7 @@ class LinuxSoundPlayer(BaseSoundPlayer):
                 self._stream.close()
                 self._stream = None
 
-    def play(self, layer=None, *args, **kwargs):
-        """Start playback of a layer or all layers.
-
-        Args:
-            layer: Specific layer to play, or None for all layers
-
-        For the player (layer=None), this also starts the audio output stream.
-        """
-        logger.debug("LinuxSoundPlayer.play(%s)", layer)
-        if layer is not None:
-            # Play specific layer only
-            return self._audio_layers[layer].play()
-        else:
-            # Play all layers and start output stream
-            for audio_layer in self._audio_layers.values():
-                audio_layer.play()
-            super().play(*args, **kwargs)
-
-    def pause(self, layer=None, *args, **kwargs):
-        """Pause playback of a layer or all layers.
-
-        Args:
-            layer: Specific layer to pause, or None for all layers
-
-        For the player (layer=None), this also stops the audio output stream.
-        """
-        logger.debug("LinuxSoundPlayer.pause(%s)", layer)
-        with self._lock:
-            if layer is not None:
-                # Pause specific layer only
-                return self._audio_layers[layer].pause()
-            else:
-                # Pause all layers and stop output stream
-                for audio_layer in self._audio_layers.values():
-                    if audio_layer.status() != STATUS.PAUSED:
-                        audio_layer.pause()
-                super().pause(*args, **kwargs)
-
-    def stop(self, layer=None, *args, **kwargs):
-        """Stop playback of a layer or all layers.
-
-        Args:
-            layer: Specific layer to stop, or None for all layers
-
-        For the player (layer=None), this also stops and closes the audio output stream.
-        """
-        logger.debug("LinuxSoundPlayer.stop(%s)", layer)
-        with self._lock:
-            if layer is not None:
-                # Stop specific layer only
-                return self._audio_layers[layer].stop()
-            else:
-                # Stop all layers and close output stream
-                for audio_layer in self._audio_layers.values():
-                    audio_layer.stop()
-                super().stop(*args, **kwargs)
-
     # Hooks for StatusMixin
-
     def _do_play(self):
         """Hook called when play status changes to PLAYING."""
         # Start the audio output stream

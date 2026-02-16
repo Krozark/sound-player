@@ -192,6 +192,7 @@ class TestAudioLayerPause:
         sound1 = mock_sound()
         sound2 = mock_sound()
         layer._queue_current.extend([sound1, sound2])
+        layer.play()  # Need to be playing to pause
         layer.pause()
         sound1.pause.assert_called_once()
         sound2.pause.assert_called_once()

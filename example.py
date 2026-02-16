@@ -45,7 +45,6 @@ def test_basic_sound():
 
     sound = Sound("data/music.ogg")
     player["main"].enqueue(sound)
-    time.sleep(3)
 
     print("Playing sound...")
     player.play()
@@ -81,7 +80,7 @@ def test_audio_layer_concurrency():
     player["main"].enqueue(Sound("data/coin.wav"))
     player["main"].enqueue(Sound("data/coin.wav"))
 
-    print("Playing layer with 3 concurrent sounds...")
+    print("Playing layer with 2 concurrent sounds...")
     player.play()
     time.sleep(5)
 
@@ -238,7 +237,7 @@ def test_audio_configuration():
 
     print(f"Playing with config: {config.sample_rate}Hz, {config.channels}ch...")
     player.play()
-    time.sleep(3)
+    time.sleep(5)
 
     player.stop()
     time.sleep(1)
@@ -256,12 +255,12 @@ def main(verbosity: int = 0):
     print("=" * 50)
 
     test_basic_sound()
-    # test_audio_layer_concurrency()
-    # test_audio_layer_replace_mode()
-    # test_sound_player_multiple_layers()
-    # test_volume_controls()
-    # test_loop_functionality()
-    # test_audio_configuration()
+    test_audio_layer_concurrency()
+    test_audio_layer_replace_mode()
+    test_sound_player_multiple_layers()
+    test_volume_controls()
+    test_loop_functionality()
+    test_audio_configuration()
 
     print("\n" + "=" * 50)
     print("All examples completed!")

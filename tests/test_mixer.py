@@ -23,10 +23,28 @@ def audio_config():
     )
 
 
+# Create a mock owner with config and volume
+class MockOwner:
+    def __init__(self, config, volume=1.0):
+        self._config = config
+        self._volume = volume
+
+    @property
+    def config(self):
+        return self._config
+
+    @property
+    def volume(self):
+        return self._volume
+
+    def set_volume(self, volume):
+        self._volume = max(0.0, min(1.0, volume))
+
+
 @pytest.fixture
 def mixer(audio_config):
     """Create a test mixer."""
-    return AudioMixer(audio_config, volume=1.0)
+    return AudioMixer(MockOwner(audio_config, volume=1.0))
 
 
 class MockSound:
@@ -37,6 +55,10 @@ class MockSound:
         self._status = status
         self._volume = volume
         self._loop = None
+
+    @property
+    def volume(self):
+        return self._volume
 
     def get_next_chunk(self, size):
         if self._status != STATUS.PLAYING:
@@ -85,14 +107,14 @@ class TestAudioMixer:
 
     def test_set_volume(self, mixer):
         """Test setting volume."""
-        mixer.set_volume(0.5)
+        mixer._owner.set_volume(0.5)
         assert mixer.volume == 0.5
 
         # Test clamping
-        mixer.set_volume(1.5)
+        mixer._owner.set_volume(1.5)
         assert mixer.volume == 1.0
 
-        mixer.set_volume(-0.5)
+        mixer._owner.set_volume(-0.5)
         assert mixer.volume == 0.0
 
     def test_add_sound(self, mixer):
@@ -205,7 +227,7 @@ class TestAudioMixer:
         data = np.full((audio_config.buffer_size, 2), 1000, dtype=np.int16)
         sound = MockSound(data)
 
-        mixer.set_volume(0.5)
+        mixer._owner.set_volume(0.5)
         mixer.add_sound(sound)
         chunk = mixer.get_next_chunk()
 
@@ -248,7 +270,8 @@ class TestAudioMixer:
     def test_stereo_to_mono_conversion(self, mixer, audio_config):
         """Test conversion from stereo to mono."""
         mono_config = AudioConfig(sample_rate=44100, channels=1, buffer_size=512)
-        mixer_mono = AudioMixer(mono_config)
+
+        mixer_mono = AudioMixer(MockOwner(mono_config))
 
         data = np.full((512, 2), 1000, dtype=np.int16)
         sound = MockSound(data)
