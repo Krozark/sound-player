@@ -92,7 +92,6 @@ class TestLinuxPCMSound:
         linux_sound.stop()
         assert linux_sound._resample_buffer is None
         assert linux_sound._resample_position == 0
-        assert linux_sound._is_eof is False
 
     def test_get_next_chunk_when_stopped(self, linux_sound):
         """Test get_next_chunk returns None when stopped."""

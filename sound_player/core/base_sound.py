@@ -23,7 +23,7 @@ class BaseSound(StatusObject):
         self._config = config or AudioConfig()
         self._loop = loop
         self._volume = volume
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     def set_loop(self, loop):
         logger.debug("BaseSound.set_loop(%s)", loop)

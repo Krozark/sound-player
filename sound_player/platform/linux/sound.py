@@ -55,7 +55,6 @@ class LinuxPCMSound(BaseSound):
         self._sound_file: sf.SoundFile | None = None
         self._position = 0  # Current position in samples
         self._loop_count = 0
-        self._is_eof = False
 
         # Resampling buffers
         self._resample_buffer: np.ndarray | None = None
@@ -70,7 +69,6 @@ class LinuxPCMSound(BaseSound):
             self._sound_file = sf.SoundFile(self._filepath)
             self._position = 0
             self._loop_count = 0
-            self._is_eof = False
             self._resample_buffer = None
             self._resample_position = 0
 
@@ -94,7 +92,6 @@ class LinuxPCMSound(BaseSound):
             self._sound_file = None
         self._position = 0
         self._loop_count = 0
-        self._is_eof = False
         self._resample_buffer = None
         self._resample_position = 0
 
@@ -141,13 +138,9 @@ class LinuxPCMSound(BaseSound):
                     data = np.concatenate([data, extra])
                     self._position = len(extra)
             else:
-                # No more loops, pad with zeros and mark as done
-                if len(data) > 0:
-                    padding = np.zeros((size - len(data), self._file_channels), dtype=self._config.dtype)
-                    data = np.concatenate([data, padding])
-                else:
-                    data = np.zeros((size, self._file_channels), dtype=self._config.dtype)
-                self._is_eof = True
+                # No more loops - sound is finished
+                self.stop()
+                return None
 
         # Ensure shape is (size, channels)
         if data.ndim == 1:
@@ -184,9 +177,9 @@ class LinuxPCMSound(BaseSound):
                             data = np.concatenate([data, extra])
                             self._position = len(extra)
                     else:
-                        self._is_eof = True
-                        if len(data) == 0:
-                            break
+                        # No more loops - sound is finished
+                        self.stop()
+                        break
 
                 # Convert channels if needed
                 if data.ndim == 1:

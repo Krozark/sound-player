@@ -166,7 +166,7 @@ Manages multiple audio layers:
 - `create_audio_layer(id, **kwargs)` - Create new layer
 - `enqueue(sound, layer_id)` - Add sound to layer
 - `play(layer_id)`, `pause(layer_id)`, `stop(layer_id)` - Control playback
-- `set_master_volume(volume)` - Set master volume (0.0-1.0)
+- `set_volume(volume)` - Set master volume (0.0-1.0)
 - `get_next_chunk()` - Get mixed output from all layers
 
 ### Platform Implementations

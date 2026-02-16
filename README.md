@@ -131,7 +131,7 @@ The library supports volume control at three levels:
 from sound_player import AudioConfig, AudioLayer, Sound, SoundPlayer
 
 player = SoundPlayer()
-player.set_master_volume(0.7)  # Master volume: 0.0 to 1.0
+player.set_volume(0.7)  # Master volume: 0.0 to 1.0
 
 layer = AudioLayer(volume=80)     # Layer volume: 0 to 100
 sound = Sound("music.ogg")
@@ -188,7 +188,7 @@ Main class for managing multiple audio layers.
 | `play(layer_id=None)` | Start playback (all layers or specific) |
 | `pause(layer_id=None)` | Pause playback |
 | `stop(layer_id=None)` | Stop playback |
-| `set_master_volume(volume)` | Set master volume (0.0-1.0) |
+| `set_volume(volume)` | Set master volume (0.0-1.0) |
 | `clear(layer_id=None)` | Clear queues |
 
 ### AudioLayer
