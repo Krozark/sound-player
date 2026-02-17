@@ -4,7 +4,7 @@ This package provides reusable mixins for managing status, volume, locks,
 audio configuration, and fade effects.
 """
 
-from .audio_config import AudioConfigMixin
+from .audio_config import AudioConfigMixin, get_global_audio_config, set_global_audio_config
 from .fade import FadeCurve, FadeMixin, FadeState
 from .lock import LockMixin
 from .status import STATUS, StatusMixin
@@ -19,4 +19,6 @@ __all__ = [
     "FadeState",
     "FadeCurve",
     "FadeMixin",
+    "get_global_audio_config",
+    "set_global_audio_config",
 ]

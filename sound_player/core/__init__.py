@@ -13,6 +13,8 @@ from .mixins import (
     FadeState,
     StatusMixin,
     VolumeMixin,
+    get_global_audio_config,
+    set_global_audio_config,
 )
 
 __all__ = [
@@ -24,6 +26,8 @@ __all__ = [
     "FadeState",
     "FadeCurve",
     "FadeMixin",
+    "get_global_audio_config",
+    "set_global_audio_config",
     "MAX_INT8",
     "MAX_INT16",
     "MAX_INT24",

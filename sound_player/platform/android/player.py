@@ -62,7 +62,7 @@ class AndroidSoundPlayer(BaseSoundPlayer):
         if not ANDROID_AVAILABLE:
             raise RuntimeError("Android APIs not available")
 
-        super().__init__(config or AudioConfig())
+        super().__init__(config)
         self._audiotrack = None
         self._output_thread = None
         self._stop_output_event = threading.Event()
@@ -82,11 +82,11 @@ class AndroidSoundPlayer(BaseSoundPlayer):
             AudioFormatBuilder = autoclass("android.media.AudioFormat$Builder")
 
             logger.debug(
-                f"Creating AudioTrack: {self._config.sample_rate}Hz, {self._config.channels}ch, {self._config.dtype}"
+                f"Creating AudioTrack: {self.config.sample_rate}Hz, {self.config.channels}ch, {self.config.dtype}"
             )
 
             # Determine channel mask
-            channel_mask = self.CHANNEL_OUT_STEREO if self._config.channels == 2 else self.CHANNEL_OUT_MONO
+            channel_mask = self.CHANNEL_OUT_STEREO if self.config.channels == 2 else self.CHANNEL_OUT_MONO
 
             # Determine encoding
             encoding = self.ENCODING_PCM_16BIT
@@ -99,7 +99,7 @@ class AndroidSoundPlayer(BaseSoundPlayer):
             fmt = (
                 AudioFormatBuilder()
                 .setEncoding(encoding)
-                .setSampleRate(self._config.sample_rate)
+                .setSampleRate(self.config.sample_rate)
                 .setChannelMask(channel_mask)
                 .build()
             )
@@ -107,8 +107,8 @@ class AndroidSoundPlayer(BaseSoundPlayer):
             # Calculate buffer size in bytes
             # Android recommends buffer_size = sample_rate * channels * bytes_per_sample / buffers_per_second
             # Using a reasonable buffer size
-            min_buffer_size = AudioTrack.getMinBufferSize(self._config.sample_rate, channel_mask, encoding)
-            buffer_size = max(min_buffer_size, self._config.buffer_size * self._config.channels * bytes_per_sample)
+            min_buffer_size = AudioTrack.getMinBufferSize(self.config.sample_rate, channel_mask, encoding)
+            buffer_size = max(min_buffer_size, self.config.buffer_size * self.config.channels * bytes_per_sample)
 
             # Create AudioTrack in stream mode
             self._audiotrack = AudioTrack(attrs, fmt, buffer_size, self.MODE_STREAM, 0)
@@ -134,7 +134,7 @@ class AndroidSoundPlayer(BaseSoundPlayer):
                     self._write_audio(chunk)
                 else:
                     # No audio data, write a small silence buffer
-                    silence = np.zeros((self._config.buffer_size // 4, self._config.channels), dtype=self._config.dtype)
+                    silence = np.zeros((self.config.buffer_size // 4, self.config.channels), dtype=self.config.dtype)
                     self._write_audio(silence)
             else:
                 # Not playing, wait a bit
