@@ -25,14 +25,24 @@ try:
     MediaFormat = autoclass("android.media.MediaFormat")
     MediaCodec = autoclass("android.media.MediaCodec")
     MediaCodecBufferInfo = autoclass("android.media.MediaCodec$BufferInfo")
+    _AudioFormat = autoclass("android.media.AudioFormat")
+
+    _ENCODING_PCM_16BIT = _AudioFormat.ENCODING_PCM_16BIT
+    _ENCODING_PCM_32BIT = _AudioFormat.ENCODING_PCM_32BIT
 
     ANDROID_AVAILABLE = True
 except Exception:
     ANDROID_AVAILABLE = False
+    # Fallback values for non-Android environments (matches Android API values)
+    _ENCODING_PCM_16BIT = 2   # AudioFormat.ENCODING_PCM_16BIT
+    _ENCODING_PCM_32BIT = 22  # AudioFormat.ENCODING_PCM_32BIT (API 31+)
     logger.warning("Android APIs not available")
 
-# Android AudioFormat encoding constant
-ENCODING_PCM_16BIT = 2
+# Maps numpy dtype -> Android PCM encoding constant
+_ENCODING_BY_DTYPE = {
+    np.dtype(np.int16): _ENCODING_PCM_16BIT,
+    np.dtype(np.int32): _ENCODING_PCM_32BIT,
+}
 
 __all__ = [
     "AndroidPCMSound",
@@ -170,7 +180,8 @@ class AndroidPCMSound(BaseSound):
             # Configure codec for PCM output
             config = self.config
             output_format = MediaFormat.createAudioFormat("audio/raw", config.sample_rate, config.channels)
-            output_format.setInteger("pcm-encoding", ENCODING_PCM_16BIT)
+            encoding = _ENCODING_BY_DTYPE.get(config.dtype, _ENCODING_PCM_16BIT)
+            output_format.setInteger("pcm-encoding", encoding)
 
             self._codec.configure(output_format, None, None, 0)
             self._codec.start()
@@ -268,27 +279,23 @@ class AndroidPCMSound(BaseSound):
             size = buffer_info.size
 
             if size > 0:
-                # Convert to numpy array (int16 PCM)
-                chunk = np.frombuffer(data[:size], dtype=np.int16)
-
                 config = self.config
+                # Convert to numpy array using configured dtype (MediaCodec outputs in the requested encoding)
+                chunk = np.frombuffer(data[:size], dtype=config.dtype)
+
                 # Handle channels (MediaCodec gives interleaved PCM)
                 if self._file_channels == 1 and config.channels == 2:
                     # Mono to stereo
                     chunk = np.column_stack((chunk, chunk)).flatten()
                 elif self._file_channels == 2 and config.channels == 1:
                     # Stereo to mono
-                    chunk = chunk.reshape(-1, 2).mean(axis=1).astype(np.int16)
+                    chunk = chunk.reshape(-1, 2).mean(axis=1).astype(config.dtype)
 
                 # Resample if needed
                 if self._file_sample_rate != config.sample_rate:
                     chunk = self._resample(chunk)
 
-                # Convert to config dtype
-                if config.dtype == np.int16:
-                    pass  # Already int16
-                elif config.dtype == np.int32:
-                    chunk = (chunk.astype(np.int32) * 65536).astype(np.int32)
+                # No dtype conversion needed: MediaCodec was configured with config.dtype encoding
 
                 # Add to PCM buffer
                 with self._buffer_lock:
@@ -316,7 +323,7 @@ class AndroidPCMSound(BaseSound):
 
         # Use numpy's linear interpolation
         indices = np.linspace(0, len(data) - 1, output_length)
-        return np.interp(indices, np.arange(len(data)), data).astype(np.int16)
+        return np.interp(indices, np.arange(len(data)), data).astype(self.config.dtype)
 
     def _release_decoder(self):
         """Release decoder resources."""

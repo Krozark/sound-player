@@ -21,11 +21,41 @@ try:
     AudioTrack = autoclass("android.media.AudioTrack")
     AudioAttributesBuilder = autoclass("android.media.AudioAttributes$Builder")
     AudioFormatBuilder = autoclass("android.media.AudioFormat$Builder")
+    _AudioFormat = autoclass("android.media.AudioFormat")
+    _AudioAttributes = autoclass("android.media.AudioAttributes")
+
+    _ENCODING_PCM_16BIT = _AudioFormat.ENCODING_PCM_16BIT
+    _ENCODING_PCM_32BIT = _AudioFormat.ENCODING_PCM_32BIT
+    _CHANNEL_OUT_MONO = _AudioFormat.CHANNEL_OUT_MONO
+    _CHANNEL_OUT_STEREO = _AudioFormat.CHANNEL_OUT_STEREO
+    _MODE_STREAM = AudioTrack.MODE_STREAM
+    _USAGE_MEDIA = _AudioAttributes.USAGE_MEDIA
+    _CONTENT_TYPE_MUSIC = _AudioAttributes.CONTENT_TYPE_MUSIC
 
     ANDROID_AVAILABLE = True
 except Exception:
     ANDROID_AVAILABLE = False
+    # Fallback values for non-Android environments (matches Android API values)
+    _ENCODING_PCM_16BIT = 2   # AudioFormat.ENCODING_PCM_16BIT
+    _ENCODING_PCM_32BIT = 22  # AudioFormat.ENCODING_PCM_32BIT (API 31+)
+    _CHANNEL_OUT_MONO = 4     # AudioFormat.CHANNEL_OUT_MONO
+    _CHANNEL_OUT_STEREO = 12  # AudioFormat.CHANNEL_OUT_STEREO
+    _MODE_STREAM = 1          # AudioTrack.MODE_STREAM
+    _USAGE_MEDIA = 1          # AudioAttributes.USAGE_MEDIA
+    _CONTENT_TYPE_MUSIC = 2   # AudioAttributes.CONTENT_TYPE_MUSIC
     logger.warning("Android APIs not available")
+
+# Maps numpy dtype -> Android PCM encoding constant
+_ENCODING_BY_DTYPE = {
+    np.dtype(np.int16): _ENCODING_PCM_16BIT,
+    np.dtype(np.int32): _ENCODING_PCM_32BIT,
+}
+
+# Maps channel count -> Android channel mask constant
+_CHANNEL_MASK_BY_CHANNELS = {
+    1: _CHANNEL_OUT_MONO,
+    2: _CHANNEL_OUT_STEREO,
+}
 
 __all__ = [
     "AndroidSoundPlayer",
@@ -40,19 +70,6 @@ class AndroidSoundPlayer(BaseSoundPlayer):
     - Runs a background thread to continuously pull and write audio data
     - Supports play/pause/stop control via inherited StatusMixin
     """
-
-    # Android AudioFormat constants
-    ENCODING_PCM_16BIT = 2
-    CHANNEL_OUT_MONO = 4
-    CHANNEL_OUT_STEREO = 12
-    MODE_STREAM = 1
-
-    # Android AudioManager constants
-    STREAM_MUSIC = 3
-
-    # Android AudioAttributes constants
-    USAGE_MEDIA = 1
-    CONTENT_TYPE_MUSIC = 2
 
     def __init__(self, config: AudioConfig | None = None):
         """Initialize the AndroidSoundPlayer.
@@ -86,15 +103,18 @@ class AndroidSoundPlayer(BaseSoundPlayer):
                 f"Creating AudioTrack: {config.sample_rate}Hz, {config.channels}ch, {config.dtype}"
             )
 
-            # Determine channel mask
-            channel_mask = self.CHANNEL_OUT_STEREO if config.channels == 2 else self.CHANNEL_OUT_MONO
+            # Determine channel mask from config
+            channel_mask = _CHANNEL_MASK_BY_CHANNELS.get(config.channels)
+            if channel_mask is None:
+                raise ValueError(f"Unsupported channel count: {config.channels}")
 
-            # Determine encoding
-            encoding = self.ENCODING_PCM_16BIT
-            bytes_per_sample = 2
+            # Determine encoding from config dtype
+            encoding = _ENCODING_BY_DTYPE.get(config.dtype)
+            if encoding is None:
+                raise ValueError(f"Unsupported dtype: {config.dtype}")
 
             # Create audio attributes (API 21+)
-            attrs = AudioAttributesBuilder().setUsage(self.USAGE_MEDIA).setContentType(self.CONTENT_TYPE_MUSIC).build()
+            attrs = AudioAttributesBuilder().setUsage(_USAGE_MEDIA).setContentType(_CONTENT_TYPE_MUSIC).build()
 
             # Create audio format
             fmt = (
@@ -109,10 +129,10 @@ class AndroidSoundPlayer(BaseSoundPlayer):
             # Android recommends buffer_size = sample_rate * channels * bytes_per_sample / buffers_per_second
             # Using a reasonable buffer size
             min_buffer_size = AudioTrack.getMinBufferSize(config.sample_rate, channel_mask, encoding)
-            buffer_size = max(min_buffer_size, config.buffer_size * config.channels * bytes_per_sample)
+            buffer_size = max(min_buffer_size, config.buffer_size * config.channels * config.sample_width)
 
             # Create AudioTrack in stream mode
-            self._audiotrack = AudioTrack(attrs, fmt, buffer_size, self.MODE_STREAM, 0)
+            self._audiotrack = AudioTrack(attrs, fmt, buffer_size, _MODE_STREAM, 0)
 
             logger.debug(f"AudioTrack created successfully with buffer size: {buffer_size}")
 
