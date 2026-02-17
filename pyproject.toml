@@ -7,7 +7,7 @@ name = "sound-player"
 version = "1.0.0"
 description = "The aim of this project is to create multi audio layer player with professional audio mixing"
 readme = "README.md"
-license = {text = "BSD-2-Clause"}
+license = "BSD-2-Clause"
 requires-python = ">=3.11"
 authors = [
     {name = "Maxime Barbier", email = "maxime.barbier1991+ava@gmail.com"},
@@ -38,6 +38,9 @@ dev = [
     "pytest-cov>=4.0",
     "pre-commit>=3.0",
 ]
+
+[tool.setuptools.packages.find]
+include = ["sound_player*"]
 
 [project.urls]
 Homepage = "https://github.com/Krozark/sound-player"
