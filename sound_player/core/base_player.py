@@ -42,7 +42,7 @@ class BaseSoundPlayer(StatusMixin, VolumeMixin, AudioConfigMixin, ABC):
         super().__init__(*args, **kwargs)
         self._audio_layers: dict[str, AudioLayer] = {}
 
-    def create_audio_layer(self, layer, force=False, *args, **kwargs):
+    def create_audio_layer(self, layer, force=False, *args, **kwargs) -> AudioLayer:
         """Create a new audio layer.
 
         Args:
@@ -55,13 +55,15 @@ class BaseSoundPlayer(StatusMixin, VolumeMixin, AudioConfigMixin, ABC):
             if layer in self._audio_layers:
                 if not force:
                     logger.warning(f"AudioLayer {layer} already exists")
-                    return
+                    return self._audio_layers[layer]
                 logger.debug(f"AudioLayer {layer} exists, overwriting due to force=True")
 
             # Pass config to AudioLayer if not provided
             if "config" not in kwargs:
                 kwargs["config"] = self.config
-            self._audio_layers[layer] = AudioLayer(*args, **kwargs)
+            new_layer = AudioLayer(*args, **kwargs)
+            self._audio_layers[layer] = new_layer
+            return new_layer
 
     def enqueue(self, sound, layer):
         """Add a sound to a specific audio layer.

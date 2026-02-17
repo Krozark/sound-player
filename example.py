@@ -43,10 +43,10 @@ def test_basic_sound():
     print("=" * 50)
 
     player = SoundPlayer()
-    player.create_audio_layer("main", concurrency=1)
+    layer = player.create_audio_layer("main", concurrency=1)
 
     sound = Sound("data/music.ogg")
-    player["main"].enqueue(sound)
+    layer.enqueue(sound)
 
     print("Playing sound...")
     player.play()
@@ -72,10 +72,10 @@ def test_change_sound_volume():
     print("=" * 50)
 
     player = SoundPlayer()
-    player.create_audio_layer("main", concurrency=1)
+    layer = player.create_audio_layer("main", concurrency=1)
 
     sound = Sound("data/music.ogg")
-    player["main"].enqueue(sound)
+    layer.enqueue(sound)
 
     print("Playing sound...")
     player.play()
@@ -98,6 +98,37 @@ def test_change_sound_volume():
     time.sleep(1)
 
 
+def test_change_layer_volume():
+    print("=" * 50)
+    print("Test 1: Layer volume Change")
+    print("=" * 50)
+
+    player = SoundPlayer()
+    layer = player.create_audio_layer("main", concurrency=1)
+    sound = Sound("data/music.ogg")
+    layer.enqueue(sound)
+
+    print("Playing sound...")
+    player.play()
+    time.sleep(3)
+
+    print("setting volume to 50%...")
+    layer.set_volume(0.5)
+    time.sleep(3)
+
+    print("setting volume to 20%...")
+    layer.set_volume(0.2)
+    time.sleep(3)
+
+    print("setting volume to 100%...")
+    layer.set_volume(1.0)
+    time.sleep(3)
+
+    print("Stopping sound...")
+    player.stop()
+    time.sleep(1)
+
+
 def test_audio_layer_concurrency():
     """Test AudioLayer with concurrent sound playback."""
     print("\n" + "=" * 50)
@@ -107,13 +138,13 @@ def test_audio_layer_concurrency():
     player = SoundPlayer()
 
     # Create an AudioLayer that allows up to 2 concurrent sounds
-    player.create_audio_layer("main", concurrency=2, replace=False)
+    layer = player.create_audio_layer("main", concurrency=2, replace=False)
 
     # Enqueue multiple sounds
-    player["main"].enqueue(Sound("data/coin.wav"))
-    player["main"].enqueue(Sound("data/music.ogg"))
-    player["main"].enqueue(Sound("data/coin.wav"))
-    player["main"].enqueue(Sound("data/coin.wav"))
+    layer.enqueue(Sound("data/coin.wav"))
+    layer.enqueue(Sound("data/music.ogg"))
+    layer.enqueue(Sound("data/coin.wav"))
+    layer.enqueue(Sound("data/coin.wav"))
 
     print("Playing layer with 2 concurrent sounds...")
     player.play()
@@ -134,10 +165,10 @@ def test_audio_layer_replace_mode():
 
     # Create an AudioLayer with replace mode
     # When limit is exceeded, oldest sounds are stopped
-    player.create_audio_layer("main", concurrency=2, replace=True)
+    layer = player.create_audio_layer("main", concurrency=2, replace=True)
 
-    player["main"].enqueue(Sound("data/music.ogg"))
-    player["main"].enqueue(Sound("data/coin.wav"))
+    layer.enqueue(Sound("data/music.ogg"))
+    layer.enqueue(Sound("data/coin.wav"))
 
     print("Playing with 2 sounds...")
     player.play()
@@ -145,8 +176,8 @@ def test_audio_layer_replace_mode():
 
     # Adding more sounds will replace the oldest ones
     print("Adding more sounds (replace mode)...")
-    player["main"].enqueue(Sound("data/coin.wav"))
-    player["main"].enqueue(Sound("data/coin.wav"))
+    layer.enqueue(Sound("data/coin.wav"))
+    layer.enqueue(Sound("data/coin.wav"))
     time.sleep(3)
 
     player.stop()
@@ -162,13 +193,13 @@ def test_sound_player_multiple_layers():
     player = SoundPlayer()
 
     # Create a music layer with background music
-    player.create_audio_layer("music", concurrency=1, volume=0.7)
-    player["music"].enqueue(Sound("data/music.ogg"))
+    layer = player.create_audio_layer("music", concurrency=1, volume=0.7)
+    layer.enqueue(Sound("data/music.ogg"))
 
     # Create a sound effects layer
-    player.create_audio_layer("sfx", concurrency=1, volume=1.0)
-    player["sfx"].enqueue(Sound("data/coin.wav"))
-    player["sfx"].enqueue(Sound("data/coin.wav"))
+    layer2 = player.create_audio_layer("sfx", concurrency=1, volume=1.0)
+    layer2.enqueue(Sound("data/coin.wav"))
+    layer2.enqueue(Sound("data/coin.wav"))
 
     print("Playing all layers...")
     player.play()
@@ -197,9 +228,9 @@ def test_volume_controls():
     player = SoundPlayer()
 
     # Create layers with different volumes
-    player.create_audio_layer("music", volume=1.0)  # 100% volume
+    layer = player.create_audio_layer("music", volume=1.0)  # 100% volume
 
-    player["music"].enqueue(Sound("data/music.ogg"))
+    layer.enqueue(Sound("data/music.ogg"))
 
     print("Playing with music at 100% volume...")
     player.play()
@@ -227,11 +258,11 @@ def test_loop_functionality():
 
     # Test sound-level looping with a player
     player = SoundPlayer()
-    player.create_audio_layer("test", concurrency=1)
+    layer = player.create_audio_layer("test", concurrency=1)
 
     sound = Sound("data/coin.wav")
     sound.set_loop(3)  # Play 3 times
-    player["test"].enqueue(sound)
+    layer.enqueue(sound)
 
     print("Playing sound 3 times...")
     player.play()
@@ -241,9 +272,9 @@ def test_loop_functionality():
 
     # Delete the first layer and test layer-level looping
     player.delete_audio_layer("test")
-    player.create_audio_layer("loop_test", loop=2, concurrency=1)
-    player["loop_test"].enqueue(Sound("data/coin.wav"))
-    player["loop_test"].enqueue(Sound("data/coin.wav"))
+    layer2 = player.create_audio_layer("loop_test", loop=2, concurrency=1)
+    layer2.enqueue(Sound("data/coin.wav"))
+    layer2.enqueue(Sound("data/coin.wav"))
 
     print("Playing layer with loop=2...")
     player.play()
@@ -267,8 +298,8 @@ def test_audio_configuration():
     )
 
     player = SoundPlayer(config=config)
-    player.create_audio_layer("music", config=config, volume=0.8)
-    player["music"].enqueue(Sound("data/music.ogg"))
+    layer = player.create_audio_layer("music", config=config, volume=0.8)
+    layer.enqueue(Sound("data/music.ogg"))
 
     print(f"Playing with config: {config.sample_rate}Hz, {config.channels}ch...")
     player.play()
@@ -285,34 +316,34 @@ def test_manual_fade():
     print("=" * 50)
 
     player = SoundPlayer()
-    player.create_audio_layer("music", concurrency=1)
+    layer = player.create_audio_layer("music", concurrency=1)
     player.play()
 
     # Create a single sound that we'll reuse
     music = Sound("data/music.ogg")
-    player["music"].enqueue(music)
+    layer.enqueue(music)
 
     # Test fade-in with linear curve
     print("Testing fade-in with LINEAR curve...")
-    music.set_fade_curve(FadeCurve.LINEAR)
+    layer.set_fade_curve(FadeCurve.LINEAR)
     music.fade_in(duration=4.0)
     time.sleep(8)
 
     # Test fade-in with exponential curve
     print("\nTesting fade-in with EXPONENTIAL curve...")
-    music.set_fade_curve(FadeCurve.EXPONENTIAL)
+    layer.set_fade_curve(FadeCurve.EXPONENTIAL)
     music.fade_in(duration=4.0)
     time.sleep(8)
 
     # Test fade-in with log
     print("\nTesting fade-in with LOGARITHMIC...")
-    player["music"].set_fade_curve(FadeCurve.LOGARITHMIC)
+    layer.set_fade_curve(FadeCurve.LOGARITHMIC)
     music.fade_in(duration=4.0)
     time.sleep(8)
 
     # Test fade-in with s-curve
     print("\nTesting fade-in with S-CURVE...")
-    player["music"].set_fade_curve(FadeCurve.SCURVE)
+    layer.set_fade_curve(FadeCurve.SCURVE)
     music.fade_in(duration=4.0)
     time.sleep(8)
 
@@ -335,7 +366,7 @@ def test_crossfade():
 
     # Create an ambience layer with crossfade enabled
     # When a new sound is enqueued, the old one fades out while the new one fades in
-    player.create_audio_layer(
+    layer = player.create_audio_layer(
         "ambience",
         concurrency=1,
         replace=True,
@@ -346,19 +377,19 @@ def test_crossfade():
 
     print("Playing music ambience...")
     night = Sound("data/music.ogg")
-    player["ambience"].enqueue(night)
+    layer.enqueue(night)
     player.play()
     time.sleep(10)
 
     print("Crossfading to dark ship ambience (4 seconds)...")
     print("(The night sound fades out while the ship sound fades in)")
     dark_ship = Sound("data/dark-ship.wav")
-    player["ambience"].enqueue(dark_ship)
+    layer.enqueue(dark_ship)
     time.sleep(10)
 
     print("Crossfading back to night ambience (4 seconds)...")
     night2 = Sound("data/night-ambience.wav")
-    player["ambience"].enqueue(night2)
+    layer.enqueue(night2)
     time.sleep(10)
 
     print("Fading out over 3 seconds...")
@@ -380,15 +411,16 @@ def main(verbosity: int = 0):
     print("SOUND PLAYER LIBRARY - EXAMPLES")
     print("=" * 50)
 
-    # test_basic_sound()
-    # test_change_sound_volume()
-    # test_audio_layer_concurrency()
-    # test_audio_layer_replace_mode()
-    # test_sound_player_multiple_layers()
-    # test_volume_controls()
-    # test_loop_functionality()
-    # test_audio_configuration()
-    # test_manual_fade()
+    test_basic_sound()
+    test_change_layer_volume()
+    test_change_sound_volume()
+    test_audio_layer_concurrency()
+    test_audio_layer_replace_mode()
+    test_sound_player_multiple_layers()
+    test_volume_controls()
+    test_loop_functionality()
+    test_audio_configuration()
+    test_manual_fade()
     test_crossfade()
 
     print("\n" + "=" * 50)

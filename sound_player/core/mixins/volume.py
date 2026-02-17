@@ -11,14 +11,14 @@ class VolumeMixin(LockMixin):
     Thread-safe via inherited LockMixin.
     """
 
-    def __init__(self, volume: float | None = 1.0, *args, **kwargs):
+    def __init__(self, volume: float = 1.0, *args, **kwargs):
         """Initialize the volume.
 
         Args:
             volume: Initial volume (0.0-1.0), defaults to 1.0.
         """
         super().__init__(*args, **kwargs)
-        self._volume = None if volume is None else max(0.0, min(1.0, volume))
+        self._volume = max(0.0, min(1.0, volume))
 
     def set_volume(self, volume: float | None) -> None:
         """Set the volume with clamping.
@@ -27,7 +27,7 @@ class VolumeMixin(LockMixin):
             volume: Volume level (0.0-1.0), will be clamped to this range.
         """
         with self._lock:
-            self._volume = None if volume is None else max(0.0, min(1.0, volume))
+            self._volume = max(0.0, min(1.0, volume))
 
     @property
     def volume(self) -> float:
