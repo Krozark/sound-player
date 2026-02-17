@@ -372,6 +372,10 @@ pip install sound-player[windows] # Windows
 **Android:**
 - `pyjnius`, `android` - Android platform APIs (already available in python-for-android environments)
 
+```bash
+pip install sound-player[android]
+```
+
 ## License
 
 BSD 2-Clause
