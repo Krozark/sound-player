@@ -63,28 +63,37 @@ player.play()
 
 ### Basic Sound Playback
 
+> **Note:** A `Sound` on its own only manages PCM data and playback state. To actually hear audio, you need a `SoundPlayer` with an audio layer (see [Sound Player with Multiple Layers](#sound-player-with-multiple-layers)).
+
 ```python
-from sound_player import Sound
+from sound_player import Sound, SoundPlayer
+
+player = SoundPlayer()
+player.create_audio_layer("music", concurrency=1)
 
 sound = Sound("music.ogg")
+player["music"].enqueue(sound)
 
-sound.play()    # Start playback
-sound.pause()   # Pause playback
-sound.stop()    # Stop and reset
-sound.wait()    # Wait for playback to finish
+player.play()       # Start audio output
+player.pause()      # Pause playback
+player.play()       # Resume playback
+player.stop()       # Stop and reset
 ```
 
 ### Sound with Loop and Volume
 
 ```python
-from sound_player import Sound
+from sound_player import Sound, SoundPlayer
+
+player = SoundPlayer()
+player.create_audio_layer("music", concurrency=1)
 
 sound = Sound("music.ogg")
 sound.set_loop(3)      # Play 3 times (use -1 for infinite)
 sound.set_volume(0.8)   # Set volume to 80% (0.0-1.0 range)
 
-sound.play()
-sound.wait()
+player["music"].enqueue(sound)
+player.play()
 ```
 
 ### Audio Layer with Concurrency
@@ -168,11 +177,18 @@ player.play()
 ### Fade Effects
 
 ```python
-from sound_player import Sound
+from sound_player import Sound, SoundPlayer
+
+player = SoundPlayer()
+player.create_audio_layer("music", concurrency=1)
 
 sound = Sound("music.ogg")
-sound.play()
 sound.fade_in(2.0)     # Fade in over 2 seconds
+
+player["music"].enqueue(sound)
+player.play()
+
+# Later...
 sound.fade_out(3.0)    # Fade out over 3 seconds (auto-stops when done)
 ```
 
