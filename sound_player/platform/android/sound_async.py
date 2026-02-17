@@ -1,11 +1,17 @@
-"""Android PCM audio implementation using MediaExtractor and MediaCodec (sync mode).
+"""Android PCM audio implementation using MediaExtractor and MediaCodec (async mode).
 
-This module provides the AndroidPCMSound class which implements PCM-based
+This module provides the AndroidPCMSoundAsync class which implements PCM-based
 audio decoding on Android using:
 - MediaExtractor for reading audio files
-- MediaCodec in synchronous mode (dequeueInputBuffer / dequeueOutputBuffer)
-- A background decode thread with backpressure to bound RAM usage
+- MediaCodec in async (callback) mode — Android calls Python when buffers are ready
+- No decode thread: MediaCodec drives decoding from its own internal thread
+- Backpressure enforced in onInputBufferAvailable to bound RAM usage
 - Proper format conversion (sample rate, channels)
+
+Differences from AndroidPCMSound (sync):
+- Event-driven instead of polling: lower CPU overhead, no 10 ms poll latency
+- No decode thread owned by this class; MediaCodec manages its own thread
+- Slightly more complex wiring (setCallback must be called before configure)
 """
 
 import logging
@@ -21,9 +27,10 @@ from ._android_api import (
     ENCODING_BY_DTYPE,
     ENCODING_PCM_16BIT,
     MediaCodec,
-    MediaCodecBufferInfo,
     MediaExtractor,
     MediaFormat,
+    PythonJavaClass,
+    java_method,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,27 +40,116 @@ _BUFFER_FLAG_END_OF_STREAM = 4
 _MAX_BUFFER_SECONDS = 2.0
 
 __all__ = [
-    "AndroidPCMSound",
+    "AndroidPCMSoundAsync",
 ]
 
 
-class AndroidPCMSound(BaseSound):
-    """Android PCM sound implementation using MediaExtractor and MediaCodec (sync).
+class _DecodeCallback(PythonJavaClass):
+    """Bridges MediaCodec's async Java callbacks to Python.
+
+    Android calls these methods from MediaCodec's internal thread whenever
+    a buffer becomes available.  The class feeds compressed input from the
+    MediaExtractor and appends decoded PCM output to the sound's buffer.
+
+    Correct Java interface: android.media.MediaCodec.Callback  (inner class, so '$' notation).
+    """
+
+    __javainterfaces__ = ["android/media/MediaCodec$Callback"]
+    __javacontext__ = "app"
+
+    def __init__(self, sound: "AndroidPCMSoundAsync", extractor, **kwargs):
+        super().__init__(**kwargs)
+        self._sound = sound
+        self._extractor = extractor
+        self._extractor_lock = threading.Lock()
+        self._eof = False
+        config = sound.config
+        self._max_buffered_samples = int(_MAX_BUFFER_SECONDS * config.sample_rate * config.channels)
+
+    # ------------------------------------------------------------------
+    # MediaCodec.Callback methods — JNI signatures must match exactly.
+    # ------------------------------------------------------------------
+
+    @java_method("(Landroid/media/MediaCodec;I)V")
+    def onInputBufferAvailable(self, codec, index):
+        """Feed the next compressed chunk into a free codec input buffer.
+
+        JNI signature: void onInputBufferAvailable(MediaCodec codec, int index)
+        """
+        if self._eof or self._sound._stop_decoding.is_set():
+            return
+
+        # Backpressure: block this callback until the PCM buffer drains enough.
+        # Blocking here pauses input → pauses output naturally.
+        while not self._sound._stop_decoding.is_set():
+            with self._sound._buffer_lock:
+                buffered = (
+                    len(self._sound._pcm_buffer) - self._sound._pcm_buffer_position
+                    if self._sound._pcm_buffer is not None
+                    else 0
+                )
+            if buffered <= self._max_buffered_samples:
+                break
+            time.sleep(0.05)
+
+        if self._sound._stop_decoding.is_set():
+            return
+
+        with self._extractor_lock:
+            input_buffer = codec.getInputBuffer(index)
+            input_buffer.clear()
+            size = self._extractor.readSampleData(input_buffer, 0)
+            if size < 0:
+                codec.queueInputBuffer(index, 0, 0, 0, _BUFFER_FLAG_END_OF_STREAM)
+                self._eof = True
+            else:
+                pts = self._extractor.getSampleTime()
+                codec.queueInputBuffer(index, 0, size, pts, 0)
+                self._extractor.advance()
+
+    @java_method("(Landroid/media/MediaCodec;ILandroid/media/MediaCodec$BufferInfo;)V")
+    def onOutputBufferAvailable(self, codec, index, info):
+        """Handle a buffer of decoded PCM data.
+
+        JNI signature: void onOutputBufferAvailable(MediaCodec codec, int index, MediaCodec.BufferInfo info)
+        """
+        self._sound._on_decoded_data(codec, index, info)
+
+    @java_method("(Landroid/media/MediaCodec;Landroid/media/MediaFormat;)V")
+    def onOutputFormatChanged(self, codec, format):
+        """Called when the output format changes (e.g. after the first decoded frame).
+
+        JNI signature: void onOutputFormatChanged(MediaCodec codec, MediaFormat format)
+        """
+        logger.debug(f"MediaCodec output format changed: {format}")
+
+    @java_method("(Landroid/media/MediaCodec;Landroid/media/MediaCodec$CodecException;)V")
+    def onError(self, codec, e):
+        """Handle a codec error.
+
+        JNI signature: void onError(MediaCodec codec, MediaCodec.CodecException e)
+        """
+        logger.error(f"MediaCodec async error: {e}")
+
+
+class AndroidPCMSoundAsync(BaseSound):
+    """Android PCM sound using MediaExtractor + MediaCodec in async (callback) mode.
 
     This implementation:
-    - Decodes audio files using MediaExtractor/MediaCodec in synchronous mode
-    - Runs a background decode thread that fills a PCM buffer with backpressure
-      (decoding pauses when the buffer exceeds _MAX_BUFFER_SECONDS of audio)
+    - Registers a _DecodeCallback with MediaCodec before configure/start
+    - Android calls back into Python whenever an input or output buffer is ready
+    - No polling thread is created by this class; decoding is fully event-driven
+    - Backpressure is enforced in onInputBufferAvailable
     - Provides PCM audio chunks for mixing via get_next_chunk()
     """
 
     def __init__(self, *args, **kwargs):
-        """Initialize the AndroidPCMSound."""
+        """Initialize the AndroidPCMSoundAsync."""
         super().__init__(*args, **kwargs)
 
-        # MediaExtractor and MediaCodec
         self._extractor = None
         self._codec = None
+        self._callback: _DecodeCallback | None = None
 
         # Decoded audio data buffer
         self._pcm_buffer: np.ndarray | None = None
@@ -64,26 +160,24 @@ class AndroidPCMSound(BaseSound):
         self._file_sample_rate = 44100
         self._file_channels = 2
 
-        # Decoding state
-        self._decode_thread = None
         self._stop_decoding = threading.Event()
 
-        logger.debug(f"AndroidPCMSound initialized: {self._filepath}")
+        logger.debug(f"AndroidPCMSoundAsync initialized: {self._filepath}")
 
     def _do_play(self):
         """Start or resume playback."""
-        logger.debug("AndroidPCMSound._do_play()")
+        logger.debug("AndroidPCMSoundAsync._do_play()")
         if self._extractor is None:
             self._start_decoding()
 
     def _do_pause(self):
         """Pause playback."""
-        logger.debug("AndroidPCMSound._do_pause()")
-        # Decoding continues in background; data simply won't be consumed.
+        logger.debug("AndroidPCMSoundAsync._do_pause()")
+        # Decoding continues; data simply won't be consumed.
 
     def _do_stop(self):
         """Stop playback and reset state."""
-        logger.debug("AndroidPCMSound._do_stop()")
+        logger.debug("AndroidPCMSoundAsync._do_stop()")
         self._stop_decoding.set()
         self._release_decoder()
         with self._buffer_lock:
@@ -92,7 +186,7 @@ class AndroidPCMSound(BaseSound):
         self._stop_decoding.clear()
 
     def _start_decoding(self, seek_to: float = 0.0):
-        """Initialize extractor + codec and start the decode thread.
+        """Initialize extractor + codec in async callback mode.
 
         Args:
             seek_to: Optional position in seconds to seek to before decoding.
@@ -127,6 +221,10 @@ class AndroidPCMSound(BaseSound):
 
             self._codec = MediaCodec.createDecoderByType(mime)
 
+            # Register callback BEFORE configure — Android requirement for async mode.
+            self._callback = _DecodeCallback(self, self._extractor)
+            self._codec.setCallback(self._callback)
+
             config = self.config
             output_format = MediaFormat.createAudioFormat("audio/raw", config.sample_rate, config.channels)
             encoding = ENCODING_BY_DTYPE.get(config.dtype, ENCODING_PCM_16BIT)
@@ -134,86 +232,28 @@ class AndroidPCMSound(BaseSound):
             self._codec.configure(output_format, None, None, 0)
             self._codec.start()
 
-            self._decode_thread = threading.Thread(
-                target=self._decode_thread_task,
-                daemon=True,
-                name=f"Decode-{self._filepath}",
-            )
-            self._decode_thread.start()
-
             logger.debug(
-                f"Sync decoder started: file={self._file_sample_rate}Hz/{self._file_channels}ch, "
+                f"Async decoder started: file={self._file_sample_rate}Hz/{self._file_channels}ch, "
                 f"output={config.sample_rate}Hz/{config.channels}ch"
             )
 
         except Exception as e:
-            logger.error(f"Failed to start sync decoder: {e}")
+            logger.error(f"Failed to start async decoder: {e}")
             self._release_decoder()
             raise
 
-    def _decode_thread_task(self):
-        """Background thread: feeds compressed data into the codec and collects PCM output."""
-        logger.debug("Decode thread started")
-
-        config = self.config
-        max_buffered_samples = int(_MAX_BUFFER_SECONDS * config.sample_rate * config.channels)
-
-        try:
-            eof = False
-
-            while not self._stop_decoding.is_set() and not eof:
-                # Backpressure: pause when the PCM buffer is large enough.
-                with self._buffer_lock:
-                    buffered = (
-                        len(self._pcm_buffer) - self._pcm_buffer_position
-                        if self._pcm_buffer is not None
-                        else 0
-                    )
-                if buffered > max_buffered_samples:
-                    time.sleep(0.05)
-                    continue
-
-                # --- Feed input ---
-                input_buffer_id = self._codec.dequeueInputBuffer(10_000)  # 10 ms
-                if input_buffer_id < 0:
-                    time.sleep(0.001)
-                    continue
-
-                input_buffer = self._codec.getInputBuffer(input_buffer_id)
-                input_buffer.clear()
-                size = self._extractor.readSampleData(input_buffer, 0)
-
-                if size < 0:
-                    self._codec.queueInputBuffer(input_buffer_id, 0, 0, 0, _BUFFER_FLAG_END_OF_STREAM)
-                    eof = True
-                else:
-                    self._codec.queueInputBuffer(input_buffer_id, 0, size, 0, 0)
-                    self._extractor.advance()
-
-                # --- Collect output ---
-                buffer_info = MediaCodecBufferInfo()
-                output_buffer_id = self._codec.dequeueOutputBuffer(buffer_info, 10_000)
-
-                if output_buffer_id >= 0:
-                    self._on_decoded_data(output_buffer_id, buffer_info)
-                elif output_buffer_id == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
-                    logger.debug(f"Output format changed: {self._codec.getOutputFormat()}")
-                # INFO_TRY_AGAIN_LATER: just loop
-
-        except Exception as e:
-            logger.error(f"Decode thread error: {e}")
-        finally:
-            logger.debug("Decode thread ended")
-
-    def _on_decoded_data(self, buffer_id, buffer_info):
+    def _on_decoded_data(self, codec, buffer_id, buffer_info):
         """Append a decoded PCM buffer to the internal numpy buffer.
 
+        Called from _DecodeCallback.onOutputBufferAvailable on MediaCodec's thread.
+
         Args:
-            buffer_id: Output buffer index from MediaCodec.
+            codec: The MediaCodec instance (needed to release the buffer).
+            buffer_id: Output buffer index.
             buffer_info: BufferInfo containing the valid byte count.
         """
         try:
-            output_buffer = self._codec.getOutputBuffer(buffer_id)
+            output_buffer = codec.getOutputBuffer(buffer_id)
             data = output_buffer.array()
             size = buffer_info.size
 
@@ -235,7 +275,7 @@ class AndroidPCMSound(BaseSound):
                     else:
                         self._pcm_buffer = np.concatenate((self._pcm_buffer, chunk))
 
-            self._codec.releaseOutputBuffer(buffer_id, False)
+            codec.releaseOutputBuffer(buffer_id, False)
 
         except Exception as e:
             logger.error(f"Error handling decoded data: {e}")
@@ -252,10 +292,6 @@ class AndroidPCMSound(BaseSound):
         """Stop and release all decoder resources."""
         import contextlib
 
-        if self._decode_thread and self._decode_thread.is_alive():
-            self._decode_thread.join(timeout=1.0)
-        self._decode_thread = None
-
         if self._codec:
             with contextlib.suppress(Exception):
                 self._codec.stop()
@@ -266,6 +302,8 @@ class AndroidPCMSound(BaseSound):
             with contextlib.suppress(Exception):
                 self._extractor.release()
             self._extractor = None
+
+        self._callback = None
 
     def _do_get_next_chunk(self, size: int) -> np.ndarray | None:
         """Return the next chunk of decoded PCM data.
@@ -307,7 +345,7 @@ class AndroidPCMSound(BaseSound):
                 return samples[:size]
 
         # available == 0: handle loop / stop outside the lock so _start_decoding is
-        # not called while holding _buffer_lock (avoids deadlock with the decode thread).
+        # not called while holding _buffer_lock (avoids deadlock with the callback thread).
         if should_loop:
             self._release_decoder()
             self._start_decoding()
