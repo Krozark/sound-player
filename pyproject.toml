@@ -23,15 +23,16 @@ classifiers = [
 dependencies = [
     "krozark-current-platform",
     "numpy>=1.24",
-    "soundfile~=0.12",
 ]
 
 [project.optional-dependencies]
 linux = [
     "sounddevice~=0.4",
+    "soundfile~=0.12",
 ]
 windows = [
     "sounddevice~=0.4",
+    "soundfile~=0.12",
 ]
 dev = [
     "pytest>=7.0",
