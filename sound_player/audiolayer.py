@@ -157,8 +157,6 @@ class AudioLayer(StatusMixin, VolumeMixin, AudioConfigMixin):
                 sound.set_loop(self._loop)
             if self._fade_curve is not None:
                 sound.set_fade_curve(self._fade_curve)
-            if self._volume is not None:
-                sound.set_volume(self._volume)
 
             # Apply fade-in duration
             if fade_in is None:
