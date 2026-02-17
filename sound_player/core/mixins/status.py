@@ -1,9 +1,10 @@
 """Status mixin for managing playback state."""
 
 import logging
+from abc import ABC, abstractmethod
 from enum import Enum
 
-from .volume import VolumeMixin
+from .lock import LockMixin
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ class STATUS(Enum):
     PAUSED = 3
 
 
-class StatusMixin(VolumeMixin):
+class StatusMixin(LockMixin, ABC):
     """Mixin class for managing playback status with volume and thread safety.
 
     Provides status management (_status), volume management (inherited from
@@ -26,13 +27,8 @@ class StatusMixin(VolumeMixin):
     """
 
     def __init__(self, *args, **kwargs):
-        """Initialize the status.
-
-        Args:
-            volume: Initial volume (0.0-1.0), defaults to 1.0.
-        """
-        self._status = STATUS.STOPPED
         super().__init__(*args, **kwargs)
+        self._status = STATUS.STOPPED
 
     def status(self) -> STATUS:
         """Get the current playback status.
@@ -85,7 +81,7 @@ class StatusMixin(VolumeMixin):
             self._status = STATUS.STOPPED
 
     # Hooks for subclasses to override
-
+    @abstractmethod
     def _do_play(self, *args, **kwargs):
         """Hook for subclasses to implement play-specific logic.
 
@@ -93,6 +89,7 @@ class StatusMixin(VolumeMixin):
         """
         raise NotImplementedError()
 
+    @abstractmethod
     def _do_pause(self, *args, **kwargs):
         """Hook for subclasses to implement pause-specific logic.
 
@@ -100,6 +97,7 @@ class StatusMixin(VolumeMixin):
         """
         raise NotImplementedError()
 
+    @abstractmethod
     def _do_stop(self, *args, **kwargs):
         """Hook for subclasses to implement stop-specific logic.
 

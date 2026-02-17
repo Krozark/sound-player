@@ -15,8 +15,8 @@ class AudioConfigMixin:
         Args:
             config: AudioConfig instance, or None to use defaults.
         """
-        self._config = config or AudioConfig()
         super().__init__(*args, **kwargs)
+        self._config = config or AudioConfig()
 
     @property
     def config(self) -> AudioConfig:

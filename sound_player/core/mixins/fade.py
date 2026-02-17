@@ -94,40 +94,40 @@ class FadeMixin(VolumeMixin):
         Uses sample counting instead of time.time() for sample-accurate transitions.
         """
         with self._lock:
-            # If no fade, return full target volume array (usually 1.0 or target)
+            # If no fade, return constant target volume array
             if self._fade_state == FadeState.NONE:
                 return np.full(size, self._fade_target_volume, dtype=np.float32)
 
+            total = self._total_fade_samples
             start_pos = self._samples_processed
             end_pos = start_pos + size
 
-            # Generate linear progress ramp (0.0 to 1.0) for this specific chunk
-            # We map the sample range [start_pos, end_pos] to the fade progress
-            progress_steps = np.linspace(start_pos / self._total_fade_samples, end_pos / self._total_fade_samples, size)
+            # Check if fade completes within this chunk
+            fade_complete = end_pos >= total
 
-            # Clamp progress between 0.0 and 1.0
-            progress_steps = np.clip(progress_steps, 0.0, 1.0)
+            # Generate linear progress ramp for this chunk
+            start_progress = start_pos / total
+            end_progress = min(end_pos / total, 1.0)
+            progress_steps = np.linspace(start_progress, end_progress, size, dtype=np.float32)
 
-            # Apply the selected curve (Vectorized)
+            # Apply the selected curve (vectorized)
             curved_progress = self._apply_curve_vectorized(progress_steps)
 
             # Calculate actual volume multipliers: Start + (Diff * Progress)
-            multipliers = (
-                self._fade_start_volume + (self._fade_target_volume - self._fade_start_volume) * curved_progress
-            )
+            vol_diff = self._fade_target_volume - self._fade_start_volume
+            multipliers = self._fade_start_volume + vol_diff * curved_progress
 
             # Update internal counter
-            self._samples_processed += size
+            self._samples_processed = end_pos
 
-            # Check if fade is complete (if the end of this chunk reached 100%)
-            if (end_pos / self._total_fade_samples) >= 1.0:
+            # Handle fade completion
+            if fade_complete:
                 self._fade_state = FadeState.NONE
-                self._samples_processed = 0  # Reset for next fade
-
-                # Force the end of the buffer to exact target volume to avoid floating point drift
+                self._samples_processed = 0
+                # Force exact target volume at the end to avoid float drift
                 multipliers[-1] = self._fade_target_volume
 
-            return multipliers.astype(np.float32)
+            return multipliers
 
     def _apply_curve_vectorized(self, progress: np.ndarray) -> np.ndarray:
         """Apply fade curve to a numpy array of progress values (0.0-1.0).
@@ -178,22 +178,22 @@ class FadeMixin(VolumeMixin):
         """
         return self._fade_state != FadeState.NONE
 
-    def fade_in(self, duration: float, target_volume: float = 1.0) -> None:
+    def fade_in(self, duration: float) -> None:
         """Start a fade-in from 0 to target_volume over duration seconds.
 
         Args:
             duration: Fade duration in seconds
             target_volume: Target volume (0.0-1.0)
         """
-        logger.debug(f"fade_in(duration={duration}, target_volume={target_volume})")
-        self.start_fade_in(duration, target_volume)
+        logger.debug(f"fade_in(duration={duration}")
+        self.start_fade_in(duration, self._volume)
 
-    def fade_out(self, duration: float, target_volume: float = 0.0) -> None:
+    def fade_out(self, duration: float) -> None:
         """Start a fade-out from current volume to target_volume.
 
         Args:
             duration: Fade duration in seconds
             target_volume: Target volume (0.0-1.0)
         """
-        logger.debug(f"fade_out(duration={duration}, target_volume={target_volume})")
-        self.start_fade_out(duration, target_volume)
+        logger.debug(f"fade_out(duration={duration}")
+        self.start_fade_out(duration, 0.0)

@@ -18,17 +18,14 @@ class VolumeMixin(LockMixin):
             volume: Initial volume (0.0-1.0), defaults to 1.0.
         """
         super().__init__(*args, **kwargs)
-        self.set_volume(volume)
+        self._volume = max(0.0, min(1.0, volume))
 
-    def set_volume(self, volume: float) -> None:
+    def set_volume(self, volume: float | None) -> None:
         """Set the volume with clamping.
 
         Args:
             volume: Volume level (0.0-1.0), will be clamped to this range.
         """
-        if volume is None:
-            volume = 1.0
-
         with self._lock:
             self._volume = max(0.0, min(1.0, volume))
 

@@ -2,6 +2,7 @@
 
 import logging
 import time
+from abc import ABC, abstractmethod
 
 import numpy as np
 
@@ -14,7 +15,7 @@ __all__ = [
 ]
 
 
-class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin):
+class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin, ABC):
     """Base class for all sound types.
 
     Provides PCM buffer interface and platform-specific hooks for
@@ -51,8 +52,8 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin):
             timeout: Maximum time to wait in seconds, None for unlimited
         """
         logger.debug("BaseSound.wait()")
-        start_timestamps = time.time()
-        while self._status != STATUS.STOPPED and (timeout is None or start_timestamps + timeout < time.time()):
+        start_time = time.time()
+        while self._status != STATUS.STOPPED and (timeout is None or time.time() - start_time < timeout):
             time.sleep(0.1)
 
     def get_next_chunk(self, size: int) -> np.ndarray | None:
@@ -67,21 +68,22 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin):
             chunk = self._do_get_next_chunk(size)
 
             if chunk is not None:
+                # Fast path: skip fade math when not fading and target is full volume
+                if self._fade_state == FadeState.NONE and self._fade_target_volume >= 0.999:
+                    return chunk
+
                 # Get sample-accurate fade multipliers for this chunk size
                 fade_map = self._get_fade_multiplier_array(len(chunk))
 
-                # Check if we actually need to apply math (optimization)
-                # If all multipliers are 1.0, we can skip multiplication
-                if not np.all(fade_map == 1.0):
-                    # Broadcast fade_map to match channels
-                    # fade_map is (N,), chunk is (N, Channels)
-                    # We add a new axis to fade_map to make it (N, 1) for broadcasting
+                # Apply fade: broadcast fade_map (N,) to chunk (N, Channels) via (N, 1)
+                if chunk.dtype == np.float32:
+                    chunk = (chunk * fade_map[:, np.newaxis]).astype(self.config.dtype)
+                else:
                     chunk = (chunk.astype(np.float32) * fade_map[:, np.newaxis]).astype(self.config.dtype)
 
                 # Auto-stop logic:
                 # If fade finished (NONE) AND volume is effectively 0, stop playback
                 if self._fade_state == FadeState.NONE and self._fade_target_volume <= 0.001:
-                    # Double check the last sample of the map to be sure we are at 0
                     if fade_map[-1] <= 0.001:
                         self._status = STATUS.STOPPED
 
@@ -128,6 +130,7 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin):
         with self._lock:
             self._do_seek(position)
 
+    @abstractmethod
     def _do_seek(self, position: float) -> None:
         """Hook for subclasses to implement seeking.
 
@@ -136,4 +139,4 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin):
         Args:
             position: Position in seconds
         """
-        pass
+        raise NotImplementedError()

@@ -2,7 +2,6 @@
 
 import threading
 import time
-from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -10,6 +9,8 @@ import pytest
 from sound_player.core.audio_config import AudioConfig
 from sound_player.core.mixins import STATUS
 from sound_player.mixer import AudioMixer
+
+from .mock_class import MockOwner, MockSound, create_mock_sound
 
 
 @pytest.fixture
@@ -23,77 +24,10 @@ def audio_config():
     )
 
 
-# Create a mock owner with config and volume
-class MockOwner:
-    def __init__(self, config, volume=1.0):
-        self._config = config
-        self._volume = volume
-
-    @property
-    def config(self):
-        return self._config
-
-    @property
-    def volume(self):
-        return self._volume
-
-    def set_volume(self, volume):
-        self._volume = max(0.0, min(1.0, volume))
-
-
 @pytest.fixture
 def mixer(audio_config):
     """Create a test mixer."""
     return AudioMixer(MockOwner(audio_config, volume=1.0))
-
-
-class MockSound:
-    """Mock sound class for testing."""
-
-    def __init__(self, data, status=STATUS.PLAYING, volume=1.0):
-        self._data = data
-        self._status = status
-        self._volume = volume
-        self._loop = None
-
-    @property
-    def volume(self):
-        return self._volume
-
-    def get_next_chunk(self, size):
-        if self._status != STATUS.PLAYING:
-            return None
-        if len(self._data) == 0:
-            return None
-        if len(self._data) < size:
-            result = np.pad(self._data, ((0, size - len(self._data)), (0, 0)), mode="constant")
-            self._data = np.array([])
-        else:
-            result = self._data[:size]
-            self._data = self._data[size:]
-        return result
-
-    def get_sample_rate(self):
-        return 44100
-
-    def get_channels(self):
-        return 2
-
-    @property
-    def config(self):
-        return AudioConfig()
-
-    def status(self):
-        return self._status
-
-    def play(self):
-        self._status = STATUS.PLAYING
-
-    def pause(self):
-        self._status = STATUS.PAUSED
-
-    def stop(self):
-        self._status = STATUS.STOPPED
 
 
 class TestAudioMixer:
@@ -119,16 +53,14 @@ class TestAudioMixer:
 
     def test_add_sound(self, mixer):
         """Test adding a sound to the mixer."""
-        sound = MagicMock()
-        sound.status.return_value = STATUS.STOPPED
+        sound = create_mock_sound(status=STATUS.STOPPED)
 
         mixer.add_sound(sound)
         assert mixer.sound_count == 1
 
     def test_add_duplicate_sound(self, mixer):
         """Test that duplicate sounds are not added."""
-        sound = MagicMock()
-        sound.status.return_value = STATUS.PLAYING
+        sound = create_mock_sound(status=STATUS.PLAYING)
 
         mixer.add_sound(sound)
         mixer.add_sound(sound)
@@ -136,8 +68,7 @@ class TestAudioMixer:
 
     def test_remove_sound(self, mixer):
         """Test removing a sound from the mixer."""
-        sound = MagicMock()
-        sound.status.return_value = STATUS.PLAYING
+        sound = create_mock_sound(status=STATUS.PLAYING)
 
         mixer.add_sound(sound)
         assert mixer.sound_count == 1
@@ -147,10 +78,8 @@ class TestAudioMixer:
 
     def test_remove_all_sounds(self, mixer):
         """Test removing all sounds."""
-        sound1 = MagicMock()
-        sound2 = MagicMock()
-        sound1.status.return_value = STATUS.PLAYING
-        sound2.status.return_value = STATUS.PLAYING
+        sound1 = create_mock_sound(status=STATUS.PLAYING)
+        sound2 = create_mock_sound(status=STATUS.PLAYING)
 
         mixer.add_sound(sound1)
         mixer.add_sound(sound2)
@@ -161,10 +90,8 @@ class TestAudioMixer:
 
     def test_get_active_sounds(self, mixer):
         """Test getting only active sounds."""
-        playing = MagicMock()
-        playing.status.return_value = STATUS.PLAYING
-        stopped = MagicMock()
-        stopped.status.return_value = STATUS.STOPPED
+        playing = create_mock_sound(status=STATUS.PLAYING)
+        stopped = create_mock_sound(status=STATUS.STOPPED)
 
         mixer.add_sound(playing)
         mixer.add_sound(stopped)
@@ -184,6 +111,7 @@ class TestAudioMixer:
         """Test that a single sound passes through unchanged (except for volume)."""
         data = np.random.randint(-1000, 1000, size=(audio_config.buffer_size, 2), dtype=np.int16)
         sound = MockSound(data.copy())
+        sound.play()
 
         mixer.add_sound(sound)
         chunk = mixer.get_next_chunk()
@@ -201,6 +129,8 @@ class TestAudioMixer:
 
         sound1 = MockSound(data1)
         sound2 = MockSound(data2)
+        sound1.play()
+        sound2.play()
 
         mixer.add_sound(sound1)
         mixer.add_sound(sound2)
@@ -214,6 +144,7 @@ class TestAudioMixer:
         """Test that sound volume is applied correctly."""
         data = np.full((audio_config.buffer_size, 2), 1000, dtype=np.int16)
         sound = MockSound(data, volume=0.5)  # 50% volume
+        sound.play()
 
         mixer.add_sound(sound)
         chunk = mixer.get_next_chunk()
@@ -226,6 +157,7 @@ class TestAudioMixer:
         """Test that master volume is applied."""
         data = np.full((audio_config.buffer_size, 2), 1000, dtype=np.int16)
         sound = MockSound(data)
+        sound.play()
 
         mixer._owner.set_volume(0.5)
         mixer.add_sound(sound)
@@ -243,6 +175,8 @@ class TestAudioMixer:
 
         sound1 = MockSound(data.copy())
         sound2 = MockSound(data.copy())
+        sound1.play()
+        sound2.play()
 
         mixer.add_sound(sound1)
         mixer.add_sound(sound2)
@@ -258,6 +192,7 @@ class TestAudioMixer:
 
         sound = MockSound(data)
         sound.get_channels = lambda: 1
+        sound.play()
 
         mixer.add_sound(sound)
         chunk = mixer.get_next_chunk()
@@ -276,6 +211,7 @@ class TestAudioMixer:
         data = np.full((512, 2), 1000, dtype=np.int16)
         sound = MockSound(data)
         sound.get_channels = lambda: 2
+        sound.play()
 
         mixer_mono.add_sound(sound)
         chunk = mixer_mono.get_next_chunk()
@@ -290,6 +226,7 @@ class TestAudioMixer:
         # Create data that's shorter than buffer
         data = np.full((256, 2), 1000, dtype=np.int16)
         sound = MockSound(data)
+        sound.play()
 
         mixer.add_sound(sound)
         chunk = mixer.get_next_chunk()
@@ -303,7 +240,11 @@ class TestAudioMixer:
     def test_thread_safety(self, mixer, audio_config):
         """Test that mixer is thread-safe."""
         data = np.full((audio_config.buffer_size, 2), 1000, dtype=np.int16)
-        sounds = [MockSound(data.copy()) for _ in range(10)]
+        sounds = []
+        for _ in range(10):
+            s = MockSound(data.copy())
+            s.play()
+            sounds.append(s)
 
         errors = []
         results = []

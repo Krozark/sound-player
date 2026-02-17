@@ -14,6 +14,7 @@ import time
 import numpy as np
 
 from sound_player.core.base_sound import BaseSound
+from sound_player.core.mixins import STATUS
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,9 @@ try:
 except Exception:
     ANDROID_AVAILABLE = False
     logger.warning("Android APIs not available")
+
+# Android AudioFormat encoding constant
+ENCODING_PCM_16BIT = 2
 
 __all__ = [
     "AndroidPCMSound",
@@ -164,7 +168,7 @@ class AndroidPCMSound(BaseSound):
 
             # Configure codec for PCM output
             output_format = MediaFormat.createAudioFormat("audio/raw", self._config.sample_rate, self._config.channels)
-            output_format.setInteger("pcm-encoding", android.media.AudioFormat.ENCODING_PCM_16BIT)
+            output_format.setInteger("pcm-encoding", ENCODING_PCM_16BIT)
 
             self._codec.configure(output_format, None, None, 0)
             self._codec.start()
@@ -191,7 +195,6 @@ class AndroidPCMSound(BaseSound):
         logger.debug("Decode thread started")
 
         MediaCodec = autoclass("android.media.MediaCodec")
-        BUFFER_FLAG_CODEC_CONFIG = 2
         BUFFER_FLAG_END_OF_STREAM = 4
 
         try:
@@ -202,7 +205,7 @@ class AndroidPCMSound(BaseSound):
                 # Try to get input buffer
                 try:
                     input_buffer_id = self._codec.dequeueInputBuffer(10000)  # 10ms timeout
-                except:
+                except Exception:
                     continue
 
                 if input_buffer_id < 0:
@@ -215,8 +218,8 @@ class AndroidPCMSound(BaseSound):
                         logger.warning(f"Unexpected input buffer id: {input_buffer_id}")
                         continue
 
-                # Read sample data from extractor
-                sample_data = self._extractor.readSampleData(input_buffer_id)
+                # Read sample data from extractor into the input buffer
+                self._extractor.readSampleData(input_buffer_id)
                 size = self._extractor.getSampleSize()
 
                 flags = 0
@@ -314,19 +317,17 @@ class AndroidPCMSound(BaseSound):
 
     def _release_decoder(self):
         """Release decoder resources."""
+        import contextlib
+
         if self._codec:
-            try:
+            with contextlib.suppress(Exception):
                 self._codec.stop()
                 self._codec.release()
-            except:
-                pass
             self._codec = None
 
         if self._extractor:
-            try:
+            with contextlib.suppress(Exception):
                 self._extractor.release()
-            except:
-                pass
             self._extractor = None
 
         self._decoding = False
@@ -359,7 +360,9 @@ class AndroidPCMSound(BaseSound):
                     time.sleep(0.01)
                     return np.zeros((size, self._config.channels), dtype=self._config.dtype)
                 else:
-                    self.stop()
+                    # Set status directly since we're already inside the lock from get_next_chunk()
+                    self._do_stop()
+                    self._status = STATUS.STOPPED
                     return None
 
             # Determine how many samples we can return
@@ -435,10 +438,3 @@ class AndroidPCMSound(BaseSound):
     def __del__(self):
         """Cleanup on deletion."""
         self._do_stop()
-
-
-# Import android.media for constants
-try:
-    android = autoclass("android.media.AudioFormat")
-except:
-    android = None

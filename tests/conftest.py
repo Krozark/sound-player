@@ -1,27 +1,22 @@
 """Test configuration and fixtures for sound-player tests."""
 
-from unittest.mock import MagicMock
-
 import pytest
 
 from sound_player.core.mixins import STATUS
 
+from .mock_class import create_mock_sound
+
 
 @pytest.fixture
 def mock_sound():
-    """Create a mock sound object for testing."""
+    """Create a mock sound factory for testing.
+
+    Returns a factory function that creates MagicMock-based sound objects
+    via create_mock_sound from mock_class.
+    """
 
     def _create_sound(status=STATUS.STOPPED, loop=None, volume=None):
-        sound = MagicMock()
-        sound._loop = loop
-        sound._volume = volume
-        sound.status.return_value = status
-        sound.play = MagicMock()
-        sound.pause = MagicMock()
-        sound.stop = MagicMock()
-        sound.set_loop = MagicMock()
-        sound.set_volume = MagicMock()
-        return sound
+        return create_mock_sound(status=status, loop=loop, volume=volume)
 
     return _create_sound
 

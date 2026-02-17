@@ -15,6 +15,7 @@ import soundfile as sf
 
 from sound_player.core.base_sound import BaseSound
 from sound_player.core.constants import MAX_INT16, MAX_INT32
+from sound_player.core.mixins import STATUS
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,18 @@ class LinuxPCMSound(BaseSound):
         # File's native dtype for reading
         self._file_dtype = None
 
+        # Cache whether conversion is needed (avoids recalculating every chunk)
+        self._needs_conversion = (
+            self._file_sample_rate != self._config.sample_rate or self._file_channels != self._config.channels
+        )
+
+        # Cache whether float-to-int conversion is needed for _safe_read
+        self._needs_float_conversion = self._file_is_float and self._config.dtype in (
+            np.dtype(np.int16),
+            np.dtype(np.int32),
+        )
+        self._is_int16 = self._config.dtype == np.int16
+
     def _get_file_dtype(self) -> str:
         """Get the file's native dtype for safe reading.
 
@@ -90,17 +103,14 @@ class LinuxPCMSound(BaseSound):
         Returns:
             Audio data as numpy array
         """
-        if self._file_is_float and self._config.dtype in ("int16", "int32"):
-            # Read as float first, then convert
+        if self._needs_float_conversion:
+            # Read as float first, then convert to integer range
             data = self._sound_file.read(frames, dtype="float32")
-            # Convert float [-1, 1] to integer range
-            if self._config.dtype == "int16":
-                data = (data * MAX_INT16).astype(np.int16)
+            if self._is_int16:
+                return (data * MAX_INT16).astype(np.int16)
             else:  # int32
-                data = (data * MAX_INT32).astype(np.int32)
-            return data
+                return (data * MAX_INT32).astype(np.int32)
         else:
-            # Direct read is safe
             return self._sound_file.read(frames, dtype=self._config.dtype)
 
     def _do_play(self):
@@ -158,12 +168,7 @@ class LinuxPCMSound(BaseSound):
         if self._sound_file is None:
             return None
 
-        # Check if we need resampling or channel conversion
-        needs_conversion = (
-            self._file_sample_rate != self._config.sample_rate or self._file_channels != self._config.channels
-        )
-
-        if needs_conversion:
+        if self._needs_conversion:
             return self._get_converted_chunk(size)
         else:
             return self._get_raw_chunk(size)
@@ -189,7 +194,9 @@ class LinuxPCMSound(BaseSound):
                     self._position = len(extra)
             else:
                 # No more loops - sound is finished
-                self.stop()
+                # Set status directly since we're already inside the lock from get_next_chunk()
+                self._do_stop()
+                self._status = STATUS.STOPPED
                 return None
 
         # Ensure shape is (size, channels)
@@ -228,7 +235,9 @@ class LinuxPCMSound(BaseSound):
                             self._position = len(extra)
                     else:
                         # No more loops - sound is finished
-                        self.stop()
+                        # Set status directly since we're already inside the lock from get_next_chunk()
+                        self._do_stop()
+                        self._status = STATUS.STOPPED
                         break
 
                 # Convert channels if needed
@@ -286,16 +295,26 @@ class LinuxPCMSound(BaseSound):
             return data
 
         ratio = self._file_sample_rate / self._config.sample_rate
-        output_length = int(len(data) / ratio)
+        input_length = len(data)
+        output_length = int(input_length / ratio)
 
-        # Use numpy's linear interpolation
-        indices = np.linspace(0, len(data) - 1, output_length)
-        resampled = np.zeros((output_length, data.shape[1]), dtype=data.dtype)
+        if output_length == 0:
+            return np.zeros((0, data.shape[1]), dtype=data.dtype)
 
-        for channel in range(data.shape[1]):
-            resampled[:, channel] = np.interp(indices, np.arange(len(data)), data[:, channel]).astype(data.dtype)
+        # Pre-compute interpolation indices once
+        indices = np.linspace(0, input_length - 1, output_length)
+        source_indices = np.arange(input_length)
 
-        return resampled
+        if data.shape[1] == 1:
+            # Mono: single interp call, no loop needed
+            resampled = np.interp(indices, source_indices, data[:, 0]).astype(data.dtype)
+            return resampled.reshape(-1, 1)
+        else:
+            # Stereo: vectorize both channels
+            resampled = np.column_stack(
+                [np.interp(indices, source_indices, data[:, ch]) for ch in range(data.shape[1])]
+            ).astype(data.dtype)
+            return resampled
 
     def _check_loop(self) -> bool:
         """Check if we should loop and update loop counter.
