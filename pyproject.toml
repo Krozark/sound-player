@@ -1,3 +1,47 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sound-player"
+version = "1.0.0"
+description = "The aim of this project is to create multi audio layer player with professional audio mixing"
+readme = "README.md"
+license = {text = "BSD-2-Clause"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Maxime Barbier", email = "maxime.barbier1991+ava@gmail.com"},
+]
+keywords = ["sound", "player", "audio", "mixing", "pcm", "fade", "crossfade"]
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: Android",
+]
+dependencies = [
+    "krozark-current-platform",
+    "numpy>=1.24",
+    "soundfile~=0.12",
+]
+
+[project.optional-dependencies]
+linux = [
+    "sounddevice~=0.4",
+]
+windows = [
+    "sounddevice~=0.4",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pre-commit>=3.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Krozark/sound-player"
+
 [tool.ruff]
 lint.select = [
  # pycodestyle
@@ -35,3 +79,10 @@ force-single-line = false         # One import per line
 quote-style = "double"
 indent-style = "space"
 # docstring-code-format = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
