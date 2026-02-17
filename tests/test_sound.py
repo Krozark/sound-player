@@ -27,6 +27,9 @@ class MockSound(BaseSound):
     def _do_stop(self):
         self.do_stop_called = True
 
+    def _do_seek(self):
+        pass
+
 
 class TestBaseSoundInit:
     """Tests for BaseSound initialization."""

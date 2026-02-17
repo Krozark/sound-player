@@ -2,6 +2,7 @@
 
 import logging
 import time
+from abc import ABC, abstractmethod
 
 import numpy as np
 
@@ -14,7 +15,7 @@ __all__ = [
 ]
 
 
-class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin):
+class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin, ABC):
     """Base class for all sound types.
 
     Provides PCM buffer interface and platform-specific hooks for
@@ -129,6 +130,7 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin):
         with self._lock:
             self._do_seek(position)
 
+    @abstractmethod
     def _do_seek(self, position: float) -> None:
         """Hook for subclasses to implement seeking.
 
@@ -137,4 +139,4 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin):
         Args:
             position: Position in seconds
         """
-        pass
+        raise NotImplementedError()
