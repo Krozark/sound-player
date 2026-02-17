@@ -68,16 +68,17 @@ class LinuxPCMSound(BaseSound):
         self._file_dtype = None
 
         # Cache whether conversion is needed (avoids recalculating every chunk)
+        config = self.config
         self._needs_conversion = (
-            self._file_sample_rate != self._config.sample_rate or self._file_channels != self._config.channels
+            self._file_sample_rate != config.sample_rate or self._file_channels != config.channels
         )
 
         # Cache whether float-to-int conversion is needed for _safe_read
-        self._needs_float_conversion = self._file_is_float and self._config.dtype in (
+        self._needs_float_conversion = self._file_is_float and config.dtype in (
             np.dtype(np.int16),
             np.dtype(np.int32),
         )
-        self._is_int16 = self._config.dtype == np.int16
+        self._is_int16 = config.dtype == np.int16
 
     def _get_file_dtype(self) -> str:
         """Get the file's native dtype for safe reading.
@@ -87,7 +88,7 @@ class LinuxPCMSound(BaseSound):
         """
         if not self._file_is_float:
             # For integer formats, we can read directly to target dtype
-            return self._config.dtype
+            return self.config.dtype
         # For float formats, read as float32/float64 first
         return "float32"
 
@@ -111,7 +112,7 @@ class LinuxPCMSound(BaseSound):
             else:  # int32
                 return (data * MAX_INT32).astype(np.int32)
         else:
-            return self._sound_file.read(frames, dtype=self._config.dtype)
+            return self._sound_file.read(frames, dtype=self.config.dtype)
 
     def _do_play(self):
         """Start or resume playback."""
@@ -126,10 +127,11 @@ class LinuxPCMSound(BaseSound):
             self._resample_position = 0
 
             # If sample rate or channels don't match config, we need resampling/conversion
-            if self._file_sample_rate != self._config.sample_rate or self._file_channels != self._config.channels:
+            config = self.config
+            if self._file_sample_rate != config.sample_rate or self._file_channels != config.channels:
                 logger.debug(
                     f"File format mismatch: file={self._file_sample_rate}Hz/{self._file_channels}ch, "
-                    f"config={self._config.sample_rate}Hz/{self._config.channels}ch"
+                    f"config={config.sample_rate}Hz/{config.channels}ch"
                 )
 
             # Store the file's native dtype for proper reading
@@ -137,7 +139,7 @@ class LinuxPCMSound(BaseSound):
 
             # Log if file is float format
             if self._file_is_float:
-                logger.debug(f"File is float format, will convert to {self._config.dtype}")
+                logger.debug(f"File is float format, will convert to {config.dtype}")
 
     def _do_pause(self):
         """Pause playback."""
@@ -210,14 +212,15 @@ class LinuxPCMSound(BaseSound):
         if self._sound_file is None:
             return None
 
-        result = np.zeros((size, self._config.channels), dtype=self._config.dtype)
+        config = self.config
+        result = np.zeros((size, config.channels), dtype=config.dtype)
         result_pos = 0
 
         while result_pos < size:
             # Check if we need to read more data
             if self._resample_buffer is None or self._resample_position >= len(self._resample_buffer):
                 # Calculate how many file samples we need for the output
-                ratio = self._file_sample_rate / self._config.sample_rate
+                ratio = self._file_sample_rate / config.sample_rate
                 file_samples_needed = int((size - result_pos) * ratio) + 1
 
                 # Read from file (with proper float->int conversion if needed)
@@ -243,11 +246,11 @@ class LinuxPCMSound(BaseSound):
                 # Convert channels if needed
                 if data.ndim == 1:
                     data = data.reshape(-1, 1)
-                if self._file_channels != self._config.channels:
+                if self._file_channels != config.channels:
                     data = self._convert_channels(data)
 
                 # Resample if needed
-                if self._file_sample_rate != self._config.sample_rate:
+                if self._file_sample_rate != config.sample_rate:
                     data = self._resample(data)
 
                 self._resample_buffer = data
@@ -270,7 +273,7 @@ class LinuxPCMSound(BaseSound):
     def _convert_channels(self, data: np.ndarray) -> np.ndarray:
         """Convert audio data to target channel count."""
         input_channels = data.shape[1] if len(data.shape) > 1 else 1
-        target_channels = self._config.channels
+        target_channels = self.config.channels
 
         if input_channels == target_channels:
             return data
@@ -291,10 +294,11 @@ class LinuxPCMSound(BaseSound):
 
         Uses simple linear interpolation for resampling.
         """
-        if self._file_sample_rate == self._config.sample_rate:
+        config = self.config
+        if self._file_sample_rate == config.sample_rate:
             return data
 
-        ratio = self._file_sample_rate / self._config.sample_rate
+        ratio = self._file_sample_rate / config.sample_rate
         input_length = len(data)
         output_length = int(input_length / ratio)
 

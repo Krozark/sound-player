@@ -4,6 +4,11 @@ import numpy as np
 import pytest
 
 from sound_player.core.audio_config import AudioConfig
+from sound_player.core.mixins.audio_config import (
+    AudioConfigMixin,
+    get_global_audio_config,
+    set_global_audio_config,
+)
 
 
 class TestAudioConfig:
@@ -144,3 +149,63 @@ class TestAudioConfig:
         """Test mono configuration."""
         config = AudioConfig(channels=1)
         assert config.channels == 1
+
+
+class TestGlobalAudioConfig:
+    """Test suite for global AudioConfig management."""
+
+    def setup_method(self):
+        """Reset global config to defaults before each test."""
+        set_global_audio_config(AudioConfig())
+
+    def teardown_method(self):
+        """Reset global config to defaults after each test."""
+        set_global_audio_config(AudioConfig())
+
+    def test_get_global_audio_config_returns_audioconfig(self):
+        """get_global_audio_config returns an AudioConfig instance."""
+        assert isinstance(get_global_audio_config(), AudioConfig)
+
+    def test_global_config_defaults(self):
+        """Global config has AudioConfig defaults."""
+        global_config = get_global_audio_config()
+        assert global_config.sample_rate == 44100
+        assert global_config.channels == 2
+
+    def test_set_global_audio_config(self):
+        """set_global_audio_config replaces the global config."""
+        new_config = AudioConfig(sample_rate=48000, channels=1)
+        set_global_audio_config(new_config)
+        assert get_global_audio_config() is new_config
+
+    def test_set_global_audio_config_rejects_non_audioconfig(self):
+        """set_global_audio_config raises TypeError for wrong type."""
+        with pytest.raises(TypeError):
+            set_global_audio_config("not a config")
+
+    def test_mixin_no_config_uses_global(self):
+        """AudioConfigMixin without explicit config returns the global config."""
+        mixin = AudioConfigMixin()
+        assert mixin.config is get_global_audio_config()
+
+    def test_mixin_explicit_config_ignores_global(self):
+        """AudioConfigMixin with explicit config is not affected by global config."""
+        explicit = AudioConfig(sample_rate=22050)
+        mixin = AudioConfigMixin(config=explicit)
+        assert mixin.config is explicit
+
+    def test_global_config_change_reflected_in_existing_mixin(self):
+        """Changing the global config is reflected immediately in objects that use it."""
+        mixin = AudioConfigMixin()  # no explicit config -> uses global
+        new_config = AudioConfig(sample_rate=48000)
+        set_global_audio_config(new_config)
+        assert mixin.config is new_config
+        assert mixin.config.sample_rate == 48000
+
+    def test_explicit_config_not_affected_by_global_change(self):
+        """Objects with an explicit config are not affected by global config changes."""
+        explicit = AudioConfig(sample_rate=22050)
+        mixin = AudioConfigMixin(config=explicit)
+        set_global_audio_config(AudioConfig(sample_rate=48000))
+        assert mixin.config is explicit
+        assert mixin.config.sample_rate == 22050

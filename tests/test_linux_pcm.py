@@ -52,7 +52,7 @@ class TestLinuxPCMSound:
         """Test sound initialization."""
         sound = LinuxPCMSound(mock_audio_file, config=audio_config)
         assert sound._filepath == mock_audio_file
-        assert sound._config is audio_config
+        assert sound.config is audio_config
         assert sound.status() == STATUS.STOPPED
 
     def test_get_audio_config(self, linux_sound, audio_config):

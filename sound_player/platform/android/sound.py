@@ -167,7 +167,8 @@ class AndroidPCMSound(BaseSound):
             self._codec = MediaCodec.createDecoderByType(mime)
 
             # Configure codec for PCM output
-            output_format = MediaFormat.createAudioFormat("audio/raw", self._config.sample_rate, self._config.channels)
+            config = self.config
+            output_format = MediaFormat.createAudioFormat("audio/raw", config.sample_rate, config.channels)
             output_format.setInteger("pcm-encoding", ENCODING_PCM_16BIT)
 
             self._codec.configure(output_format, None, None, 0)
@@ -182,7 +183,7 @@ class AndroidPCMSound(BaseSound):
 
             logger.debug(
                 f"Decoder started: file={self._file_sample_rate}Hz/{self._file_channels}ch, "
-                f"output={self._config.sample_rate}Hz/{self._config.channels}ch"
+                f"output={config.sample_rate}Hz/{config.channels}ch"
             )
 
         except Exception as e:
@@ -270,22 +271,23 @@ class AndroidPCMSound(BaseSound):
                 # Convert to numpy array (int16 PCM)
                 chunk = np.frombuffer(data[:size], dtype=np.int16)
 
+                config = self.config
                 # Handle channels (MediaCodec gives interleaved PCM)
-                if self._file_channels == 1 and self._config.channels == 2:
+                if self._file_channels == 1 and config.channels == 2:
                     # Mono to stereo
                     chunk = np.column_stack((chunk, chunk)).flatten()
-                elif self._file_channels == 2 and self._config.channels == 1:
+                elif self._file_channels == 2 and config.channels == 1:
                     # Stereo to mono
                     chunk = chunk.reshape(-1, 2).mean(axis=1).astype(np.int16)
 
                 # Resample if needed
-                if self._file_sample_rate != self._config.sample_rate:
+                if self._file_sample_rate != config.sample_rate:
                     chunk = self._resample(chunk)
 
                 # Convert to config dtype
-                if self._config.dtype == np.int16:
+                if config.dtype == np.int16:
                     pass  # Already int16
-                elif self._config.dtype == np.int32:
+                elif config.dtype == np.int32:
                     chunk = (chunk.astype(np.int32) * 65536).astype(np.int32)
 
                 # Add to PCM buffer
@@ -305,10 +307,11 @@ class AndroidPCMSound(BaseSound):
 
         Uses simple linear interpolation for resampling.
         """
-        if self._file_sample_rate == self._config.sample_rate:
+        config = self.config
+        if self._file_sample_rate == config.sample_rate:
             return data
 
-        ratio = self._file_sample_rate / self._config.sample_rate
+        ratio = self._file_sample_rate / config.sample_rate
         output_length = int(len(data) / ratio)
 
         # Use numpy's linear interpolation
@@ -346,9 +349,10 @@ class AndroidPCMSound(BaseSound):
             if self._pcm_buffer is None:
                 return None
 
+            config = self.config
             # Get available samples
             available = len(self._pcm_buffer) - self._pcm_buffer_position
-            samples_needed = size * self._config.channels
+            samples_needed = size * config.channels
 
             if available == 0:
                 # Check if we should loop
@@ -358,7 +362,7 @@ class AndroidPCMSound(BaseSound):
                     self._start_decoding()
                     # Wait a bit for data
                     time.sleep(0.01)
-                    return np.zeros((size, self._config.channels), dtype=self._config.dtype)
+                    return np.zeros((size, config.channels), dtype=config.dtype)
                 else:
                     # Set status directly since we're already inside the lock from get_next_chunk()
                     self._do_stop()
@@ -381,13 +385,13 @@ class AndroidPCMSound(BaseSound):
                 self._pcm_buffer_position = 0
 
             # Reshape to (frames, channels)
-            frames = len(samples) // self._config.channels
-            samples = samples[: frames * self._config.channels]
-            samples = samples.reshape((frames, self._config.channels))
+            frames = len(samples) // config.channels
+            samples = samples[: frames * config.channels]
+            samples = samples.reshape((frames, config.channels))
 
             # Pad with zeros if needed
             if frames < size:
-                padding = np.zeros((size - frames, self._config.channels), dtype=self._config.dtype)
+                padding = np.zeros((size - frames, config.channels), dtype=config.dtype)
                 samples = np.concatenate((samples, padding))
 
             return samples[:size]
