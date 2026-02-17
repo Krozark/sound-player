@@ -20,6 +20,9 @@ if platform in ("linux", "windows"):
     from .linux import LinuxPCMSound as Sound
     from .linux import LinuxSoundPlayer as SoundPlayer
 elif platform == "android":
+    # Switch between sync and async decoding by changing the import:
+    #   AndroidPCMSound      — background decode thread, polling with backpressure
+    #   AndroidPCMSoundAsync — MediaCodec callback mode, event-driven, no poll thread
     from .android import AndroidPCMSound as Sound
     from .android import AndroidSoundPlayer as SoundPlayer
 else:
