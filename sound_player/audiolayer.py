@@ -7,7 +7,7 @@ from collections import deque
 
 import numpy as np
 
-from .core.mixins import STATUS, AudioConfigMixin, FadeCurve, StatusMixin
+from .core.mixins import STATUS, AudioConfigMixin, FadeCurve, StatusMixin, VolumeMixin
 from .mixer import AudioMixer
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ __all__ = [
 ]
 
 
-class AudioLayer(StatusMixin, AudioConfigMixin):
+class AudioLayer(StatusMixin, VolumeMixin, AudioConfigMixin):
     """Manages a queue of sounds with support for concurrent playback and mixing.
 
     The AudioLayer maintains two queues:
@@ -157,15 +157,14 @@ class AudioLayer(StatusMixin, AudioConfigMixin):
                 sound.set_loop(self._loop)
             if self._fade_curve is not None:
                 sound.set_fade_curve(self._fade_curve)
-
-            # Resolve the effective volume for this sound
-            volume = sound.volume
+            if self._volume is not None:
+                sound.set_volume(self._volume)
 
             # Apply fade-in duration
             if fade_in is None:
                 fade_in = self._fade_in_duration
             if fade_in is not None and fade_in > 0:
-                sound.start_fade_in(fade_in, target_volume=volume)
+                sound.fade_in(fade_in)
 
             # Store fade-out duration for later use
             if fade_out is None:
@@ -276,7 +275,7 @@ class AudioLayer(StatusMixin, AudioConfigMixin):
                                             "Crossfading out sound %s to add new one.",
                                             sound,
                                         )
-                                        sound.start_fade_out(self._fade_out_duration)
+                                        sound.fade_out(self._fade_out_duration)
                                         self._fading_out_sounds.append(sound)
                                     else:
                                         # Immediate stop

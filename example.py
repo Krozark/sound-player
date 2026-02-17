@@ -295,30 +295,30 @@ def test_manual_fade():
     # Test fade-in with linear curve
     print("Testing fade-in with LINEAR curve...")
     music.set_fade_curve(FadeCurve.LINEAR)
-    music.fade_in(duration=4.0, target_volume=0.7)
+    music.fade_in(duration=4.0)
     time.sleep(8)
 
     # Test fade-in with exponential curve
     print("\nTesting fade-in with EXPONENTIAL curve...")
     music.set_fade_curve(FadeCurve.EXPONENTIAL)
-    music.fade_in(duration=4.0, target_volume=0.7)
+    music.fade_in(duration=4.0)
     time.sleep(8)
 
     # Test fade-in with log
     print("\nTesting fade-in with LOGARITHMIC...")
     player["music"].set_fade_curve(FadeCurve.LOGARITHMIC)
-    music.fade_in(duration=4.0, target_volume=0.7)
+    music.fade_in(duration=4.0)
     time.sleep(8)
 
     # Test fade-in with s-curve
     print("\nTesting fade-in with S-CURVE...")
     player["music"].set_fade_curve(FadeCurve.SCURVE)
-    music.fade_in(duration=4.0, target_volume=0.7)
+    music.fade_in(duration=4.0)
     time.sleep(8)
 
     # Test fade-out
     print("\nTesting fade-out...")
-    music.fade_out(duration=3.0, target_volume=0.0)
+    music.fade_out(duration=3.0)
     time.sleep(4)
 
     player.stop()
@@ -344,22 +344,22 @@ def test_crossfade():
         volume=0.8,
     )
 
-    print("Playing night ambience...")
-    night = Sound("data/night-ambience.wav")
+    print("Playing music ambience...")
+    night = Sound("data/music.ogg")
     player["ambience"].enqueue(night)
     player.play()
-    time.sleep(8)
+    time.sleep(10)
 
     print("Crossfading to dark ship ambience (4 seconds)...")
     print("(The night sound fades out while the ship sound fades in)")
     dark_ship = Sound("data/dark-ship.wav")
     player["ambience"].enqueue(dark_ship)
-    time.sleep(8)
+    time.sleep(10)
 
     print("Crossfading back to night ambience (4 seconds)...")
     night2 = Sound("data/night-ambience.wav")
     player["ambience"].enqueue(night2)
-    time.sleep(8)
+    time.sleep(10)
 
     print("Fading out over 3 seconds...")
     night2.fade_out(duration=3.0)

@@ -2,11 +2,11 @@
 
 import numpy as np
 
-from sound_player.core import AudioConfig, FadeCurve, FadeMixin, FadeState, StatusMixin
+from sound_player.core import AudioConfig, FadeCurve, FadeMixin, FadeState, StatusMixin, VolumeMixin
 from sound_player.core.mixins import AudioConfigMixin
 
 
-class ConcreteFadeMixin(StatusMixin, AudioConfigMixin, FadeMixin):
+class ConcreteFadeMixin(StatusMixin, VolumeMixin, AudioConfigMixin, FadeMixin):
     """Concrete implementation of FadeMixin for testing."""
 
     def _do_play(self):

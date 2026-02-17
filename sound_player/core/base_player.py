@@ -11,7 +11,7 @@ import numpy as np
 
 from sound_player.audiolayer import AudioLayer
 
-from .mixins import STATUS, AudioConfigMixin, StatusMixin
+from .mixins import STATUS, AudioConfigMixin, StatusMixin, VolumeMixin
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ __all__ = [
 ]
 
 
-class BaseSoundPlayer(StatusMixin, AudioConfigMixin, ABC):
+class BaseSoundPlayer(StatusMixin, VolumeMixin, AudioConfigMixin, ABC):
     """Base class for platform-specific audio output.
 
     The BaseSoundPlayer:

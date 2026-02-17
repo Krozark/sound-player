@@ -178,22 +178,22 @@ class FadeMixin(VolumeMixin):
         """
         return self._fade_state != FadeState.NONE
 
-    def fade_in(self, duration: float, target_volume: float = 1.0) -> None:
+    def fade_in(self, duration: float) -> None:
         """Start a fade-in from 0 to target_volume over duration seconds.
 
         Args:
             duration: Fade duration in seconds
             target_volume: Target volume (0.0-1.0)
         """
-        logger.debug(f"fade_in(duration={duration}, target_volume={target_volume})")
-        self.start_fade_in(duration, target_volume)
+        logger.debug(f"fade_in(duration={duration}")
+        self.start_fade_in(duration, self._volume)
 
-    def fade_out(self, duration: float, target_volume: float = 0.0) -> None:
+    def fade_out(self, duration: float) -> None:
         """Start a fade-out from current volume to target_volume.
 
         Args:
             duration: Fade duration in seconds
             target_volume: Target volume (0.0-1.0)
         """
-        logger.debug(f"fade_out(duration={duration}, target_volume={target_volume})")
-        self.start_fade_out(duration, target_volume)
+        logger.debug(f"fade_out(duration={duration}")
+        self.start_fade_out(duration, 0.0)
