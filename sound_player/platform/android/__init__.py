@@ -5,10 +5,9 @@ audio playback and AudioTrack-based audio output.
 """
 
 from .player import AndroidSoundPlayer
-from .sound import ANDROID_AVAILABLE, AndroidPCMSound
+from .sound import AndroidPCMSound
 
 __all__ = [
     "AndroidPCMSound",
     "AndroidSoundPlayer",
-    "ANDROID_AVAILABLE",
 ]

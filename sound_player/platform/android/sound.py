@@ -16,33 +16,18 @@ import numpy as np
 from sound_player.core.base_sound import BaseSound
 from sound_player.core.mixins import STATUS
 
+from ._android_api import (
+    ENCODING_BY_DTYPE,
+    ENCODING_PCM_16BIT,
+    MediaCodec,
+    MediaCodecBufferInfo,
+    MediaExtractor,
+    MediaFormat,
+    PythonJavaClass,
+    java_method,
+)
+
 logger = logging.getLogger(__name__)
-
-try:
-    from jnius import PythonJavaClass, autoclass, java_method
-
-    MediaExtractor = autoclass("android.media.MediaExtractor")
-    MediaFormat = autoclass("android.media.MediaFormat")
-    MediaCodec = autoclass("android.media.MediaCodec")
-    MediaCodecBufferInfo = autoclass("android.media.MediaCodec$BufferInfo")
-    _AudioFormat = autoclass("android.media.AudioFormat")
-
-    _ENCODING_PCM_16BIT = _AudioFormat.ENCODING_PCM_16BIT
-    _ENCODING_PCM_32BIT = _AudioFormat.ENCODING_PCM_32BIT
-
-    ANDROID_AVAILABLE = True
-except Exception:
-    ANDROID_AVAILABLE = False
-    # Fallback values for non-Android environments (matches Android API values)
-    _ENCODING_PCM_16BIT = 2   # AudioFormat.ENCODING_PCM_16BIT
-    _ENCODING_PCM_32BIT = 22  # AudioFormat.ENCODING_PCM_32BIT (API 31+)
-    logger.warning("Android APIs not available")
-
-# Maps numpy dtype -> Android PCM encoding constant
-_ENCODING_BY_DTYPE = {
-    np.dtype(np.int16): _ENCODING_PCM_16BIT,
-    np.dtype(np.int32): _ENCODING_PCM_32BIT,
-}
 
 __all__ = [
     "AndroidPCMSound",
@@ -92,9 +77,6 @@ class AndroidPCMSound(BaseSound):
     def __init__(self, *args, **kwargs):
         """Initialize the AndroidPCMSound."""
         super().__init__(*args, **kwargs)
-
-        if not ANDROID_AVAILABLE:
-            raise RuntimeError("Android APIs not available")
 
         # MediaExtractor and MediaCodec
         self._extractor = None
@@ -180,7 +162,7 @@ class AndroidPCMSound(BaseSound):
             # Configure codec for PCM output
             config = self.config
             output_format = MediaFormat.createAudioFormat("audio/raw", config.sample_rate, config.channels)
-            encoding = _ENCODING_BY_DTYPE.get(config.dtype, _ENCODING_PCM_16BIT)
+            encoding = ENCODING_BY_DTYPE.get(config.dtype, ENCODING_PCM_16BIT)
             output_format.setInteger("pcm-encoding", encoding)
 
             self._codec.configure(output_format, None, None, 0)
@@ -295,8 +277,6 @@ class AndroidPCMSound(BaseSound):
                 if self._file_sample_rate != config.sample_rate:
                     chunk = self._resample(chunk)
 
-                # No dtype conversion needed: MediaCodec was configured with config.dtype encoding
-
                 # Add to PCM buffer
                 with self._buffer_lock:
                     if self._pcm_buffer is None:
@@ -323,7 +303,7 @@ class AndroidPCMSound(BaseSound):
 
         # Use numpy's linear interpolation
         indices = np.linspace(0, len(data) - 1, output_length)
-        return np.interp(indices, np.arange(len(data)), data).astype(self.config.dtype)
+        return np.interp(indices, np.arange(len(data)), data).astype(config.dtype)
 
     def _release_decoder(self):
         """Release decoder resources."""
