@@ -6,7 +6,7 @@ import time
 
 import numpy as np
 
-from .core.mixins import STATUS, AudioConfigMixin, StatusMixin
+from .core.mixins import STATUS, AudioConfigMixin, FadeCurve, StatusMixin
 from .mixer import AudioMixer
 
 logger = logging.getLogger(__name__)
@@ -33,11 +33,12 @@ class AudioLayer(StatusMixin, AudioConfigMixin):
 
     def __init__(
         self,
-        concurrency=1,
-        replace=False,
-        loop=None,
-        fade_in_duration=None,
-        fade_out_duration=None,
+        concurrency: int = 1,
+        replace: bool = False,
+        loop: int = None,
+        fade_in_duration: float = None,
+        fade_out_duration: float = None,
+        fade_curve: FadeCurve | None = None,
         *args,
         **kwargs,
     ):
@@ -59,6 +60,7 @@ class AudioLayer(StatusMixin, AudioConfigMixin):
         self._loop = loop
         self._fade_in_duration = fade_in_duration
         self._fade_out_duration = fade_out_duration
+        self._fade_curve = fade_curve
         self._queue_waiting = []
         self._queue_current = []
         self._fading_out_sounds = []  # Sounds fading out during crossfade
@@ -102,6 +104,16 @@ class AudioLayer(StatusMixin, AudioConfigMixin):
         with self._lock:
             self._loop = loop
 
+    def set_fade_curve(self, curve: FadeCurve) -> None:
+        """Set the fade curve type.
+
+        Args:
+            curve: FadeCurve enum value
+        """
+        logger.debug(f"AudioLayer.set_fade_curve({curve})")
+        with self._lock:
+            self._fade_curve = curve
+
     def set_fade_in_duration(self, duration: float) -> None:
         """Set the default fade-in duration for enqueued sounds.
 
@@ -135,10 +147,13 @@ class AudioLayer(StatusMixin, AudioConfigMixin):
         logger.debug("AudioLayer.enqueue(%s)", sound)
         with self._lock:
             logger.debug("enqueue %s" % sound)
-            loop = sound._loop or self._loop
-            volume = sound._volume or self._volume
+            loop = self._loop or sound._loop
+            volume = self._volume or sound.volume
+            fade_curve = self._fade_curve or sound._fade_curve
+
             sound.set_loop(loop)
             sound.set_volume(volume)
+            sound.set_fade_curve(fade_curve)
 
             # Apply fade-in duration
             if fade_in is None:
@@ -168,12 +183,6 @@ class AudioLayer(StatusMixin, AudioConfigMixin):
             self._fading_out_sounds.clear()
             self._queue_waiting.clear()
             self._queue_current.clear()
-
-    def _do_stop(self, *args, **kwargs):
-        """Stop playback and clear all queues."""
-        logger.debug("AudioLayer.stop()")
-        with self._lock:
-            self.clear()
 
     def _do_play(self):
         """Hook called when play status changes to PLAYING."""
@@ -247,29 +256,24 @@ class AudioLayer(StatusMixin, AudioConfigMixin):
                             place_needed = len(self._queue_current) + len(self._queue_waiting) - self._concurrency
                             if place_needed > 0 and len(self._queue_current) > 0:
                                 # Check if we should use crossfade
-                                use_crossfade = self._fade_out_duration is not None and self._fade_out_duration > 0
+                                use_fading_out = self._fade_out_duration is not None and self._fade_out_duration > 0
 
                                 for i in range(0, min(len(self._queue_current), place_needed)):
                                     sound = self._queue_current[i]
-                                    if use_crossfade:
+                                    if use_fading_out:
                                         # Start fade out for crossfade
                                         logger.debug(
                                             "Crossfading out sound %s to add new one.",
                                             sound,
                                         )
                                         sound.start_fade_out(self._fade_out_duration)
+                                        self._queue_current.pop(i)
                                         self._fading_out_sounds.append(sound)
                                     else:
                                         # Immediate stop
                                         logger.debug("stopping sound %s to add new one.", sound)
                                         sound.stop()
                                         self._mixer.remove_sound(sound)
-
-                                # Remove crossfaded sounds from current queue
-                                if use_crossfade:
-                                    for sound in self._fading_out_sounds:
-                                        if sound in self._queue_current:
-                                            self._queue_current.remove(sound)
 
                         # Add as many new as we can
                         while self._concurrency > len(self._queue_current) and len(self._queue_waiting):

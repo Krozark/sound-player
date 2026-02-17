@@ -286,6 +286,7 @@ def test_manual_fade():
 
     player = SoundPlayer()
     player.create_audio_layer("music", concurrency=1)
+    player.play()
 
     # Create a single sound that we'll reuse
     music = Sound("data/music.ogg")
@@ -294,30 +295,31 @@ def test_manual_fade():
     # Test fade-in with linear curve
     print("Testing fade-in with LINEAR curve...")
     music.set_fade_curve(FadeCurve.LINEAR)
-    music.fade_in(duration=2.0, target_volume=0.7)
-    player.play()
-    time.sleep(5)
+    music.fade_in(duration=4.0, target_volume=0.7)
+    time.sleep(8)
 
     # Test fade-in with exponential curve
     print("\nTesting fade-in with EXPONENTIAL curve...")
-    player.pause()
     music.set_fade_curve(FadeCurve.EXPONENTIAL)
-    music.fade_in(duration=2.0, target_volume=0.7)
-    player.play()
-    time.sleep(5)
+    music.fade_in(duration=4.0, target_volume=0.7)
+    time.sleep(8)
+
+    # Test fade-in with log
+    print("\nTesting fade-in with LOGARITHMIC...")
+    player["music"].set_fade_curve(FadeCurve.LOGARITHMIC)
+    music.fade_in(duration=4.0, target_volume=0.7)
+    time.sleep(8)
 
     # Test fade-in with s-curve
     print("\nTesting fade-in with S-CURVE...")
-    player.pause()
-    music.set_fade_curve(FadeCurve.SCURVE)
-    music.fade_in(duration=2.0, target_volume=0.7)
-    player.play()
-    time.sleep(5)
+    player["music"].set_fade_curve(FadeCurve.SCURVE)
+    music.fade_in(duration=4.0, target_volume=0.7)
+    time.sleep(8)
 
     # Test fade-out
     print("\nTesting fade-out...")
     music.fade_out(duration=3.0, target_volume=0.0)
-    time.sleep(5)
+    time.sleep(4)
 
     player.stop()
     time.sleep(1)
@@ -386,8 +388,8 @@ def main(verbosity: int = 0):
     # test_volume_controls()
     # test_loop_functionality()
     # test_audio_configuration()
-    # test_manual_fade()
-    test_crossfade()
+    test_manual_fade()
+    # test_crossfade()
 
     print("\n" + "=" * 50)
     print("All examples completed!")

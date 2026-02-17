@@ -25,6 +25,7 @@ class FadeCurve(IntEnum):
     EXPONENTIAL = 1  # Power curve (more natural for audio)
     LOGARITHMIC = 2  # Logarithmic curve
     SCURVE = 3  # S-curve (ease-in-ease-out)
+    DEFAULT = LINEAR
 
 
 class FadeMixin(VolumeMixin):
@@ -34,7 +35,7 @@ class FadeMixin(VolumeMixin):
     Thread-safe via inherited VolumeMixin (which inherits from LockMixin).
     """
 
-    def __init__(self, fade_curve: FadeCurve = FadeCurve.LINEAR, *args, **kwargs):
+    def __init__(self, fade_curve: FadeCurve = FadeCurve.DEFAULT, *args, **kwargs):
         """Initialize the fade mixin.
 
         Args:
@@ -130,10 +131,13 @@ class FadeMixin(VolumeMixin):
         if self._fade_curve == FadeCurve.EXPONENTIAL:
             # Power curve for more natural audio fade
             return progress**2
+            # if progress <= 0: return 0.0
+            # return (math.pow(10, progress) - 1) / 9
         elif self._fade_curve == FadeCurve.LOGARITHMIC:
             # Logarithmic curve (using base-10 log)
             # Map 0-1 to 1-10, apply log10, then map back to 0-1
             return math.log10(1 + progress * 9) / math.log10(10)
+            # return math.sin(progress * (math.pi / 2))
         elif self._fade_curve == FadeCurve.SCURVE:
             # Smooth step function (ease-in-ease-out)
             return progress * progress * (3 - 2 * progress)

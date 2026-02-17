@@ -1,7 +1,7 @@
 """Android audio output implementation using AudioTrack.
 
 This module provides the AndroidSoundPlayer class which implements audio
-output on Android using the AudioTrack API.
+output on Android using the AudioTrack API with blocking write mode.
 """
 
 import logging
@@ -29,23 +29,26 @@ __all__ = [
 
 
 class AndroidSoundPlayer(BaseSoundPlayer):
-    """Android audio output using AudioTrack.
+    """Android audio output using AudioTrack in blocking write mode.
 
     This implementation:
     - Uses AudioTrack in MODE_STREAM for real-time PCM output
-    - Runs a background thread to continuously write audio data
-    - Supports play/pause/stop control
+    - Runs a background thread to continuously pull and write audio data
+    - Supports play/pause/stop control via inherited StatusMixin
     """
 
     # Android AudioFormat constants
     ENCODING_PCM_16BIT = 2
-    ENCODING_PCM_8BIT = 3
     CHANNEL_OUT_MONO = 4
     CHANNEL_OUT_STEREO = 12
     MODE_STREAM = 1
 
+    # Android AudioManager constants
+    STREAM_MUSIC = 3
+
     # Android AudioAttributes constants
     USAGE_MEDIA = 1
+    CONTENT_TYPE_MUSIC = 2
 
     def __init__(self, config: AudioConfig | None = None):
         """Initialize the AndroidSoundPlayer.
@@ -63,13 +66,12 @@ class AndroidSoundPlayer(BaseSoundPlayer):
         self._audiotrack = None
         self._output_thread = None
         self._stop_output_thread = threading.Event()
-        self._lock = threading.RLock()
 
     def _create_output_stream(self):
         """Create the AudioTrack for PCM output.
 
         Creates an AudioTrack instance in stream mode with the configured
-        audio format.
+        audio format. Uses modern AudioAttributes API (API 21+) with fallback.
         """
         if self._audiotrack is not None:
             return
@@ -78,49 +80,53 @@ class AndroidSoundPlayer(BaseSoundPlayer):
             AudioTrack = autoclass("android.media.AudioTrack")
             AudioAttributesBuilder = autoclass("android.media.AudioAttributes$Builder")
             AudioFormatBuilder = autoclass("android.media.AudioFormat$Builder")
+            AudioManager = autoclass("android.media.AudioManager")
 
-            logger.debug(f"Creating AudioTrack: {self._config.sample_rate}Hz, {self._config.channels}ch, 16bit")
-
-            # Create audio attributes
-            attrs = AudioAttributesBuilder().setUsage(self.USAGE_MEDIA).build()
+            logger.debug(
+                f"Creating AudioTrack: {self._config.sample_rate}Hz, {self._config.channels}ch, {self._config.dtype}"
+            )
 
             # Determine channel mask
             channel_mask = self.CHANNEL_OUT_STEREO if self._config.channels == 2 else self.CHANNEL_OUT_MONO
 
+            # Determine encoding
+            encoding = self.ENCODING_PCM_16BIT
+            bytes_per_sample = 2
+
+            # Create audio attributes (API 21+)
+            attrs = AudioAttributesBuilder().setUsage(self.USAGE_MEDIA).setContentType(self.CONTENT_TYPE_MUSIC).build()
+
             # Create audio format
             fmt = (
                 AudioFormatBuilder()
-                .setEncoding(self.ENCODING_PCM_16BIT)
+                .setEncoding(encoding)
                 .setSampleRate(self._config.sample_rate)
                 .setChannelMask(channel_mask)
                 .build()
             )
 
             # Calculate buffer size in bytes
-            buffer_size = self._config.buffer_size * self._config.channels * 2  # 2 bytes per sample (16-bit)
+            # Android recommends buffer_size = sample_rate * channels * bytes_per_sample / buffers_per_second
+            # Using a reasonable buffer size
+            min_buffer_size = AudioTrack.getMinBufferSize(self._config.sample_rate, channel_mask, encoding)
+            buffer_size = max(min_buffer_size, self._config.buffer_size * self._config.channels * bytes_per_sample)
 
             # Create AudioTrack in stream mode
-            self._audiotrack = AudioTrack(
-                attrs,
-                fmt,
-                buffer_size,
-                self.MODE_STREAM,
-                0,  # sessionId
-            )
+            self._audiotrack = AudioTrack(attrs, fmt, buffer_size, self.MODE_STREAM, 0)
 
-            logger.debug("AudioTrack created successfully")
+            logger.debug(f"AudioTrack created successfully with buffer size: {buffer_size}")
 
         except Exception as e:
             logger.error(f"Failed to create AudioTrack: {e}")
             raise
 
     def _output_thread_task(self):
-        """Background thread task that continuously writes audio data.
+        """Background thread that continuously writes audio data.
 
         This thread runs continuously while playing, pulling audio data
-        from get_next_chunk() and writing it to the AudioTrack.
+        from get_next_chunk() and writing it to the AudioTrack in blocking mode.
         """
-        logger.debug("Output thread started")
+        logger.debug("Audio output thread started")
 
         while not self._stop_output_thread.is_set():
             if self._status == STATUS.PLAYING and self._audiotrack:
@@ -131,19 +137,17 @@ class AndroidSoundPlayer(BaseSoundPlayer):
                     # No audio data, write a small silence buffer
                     silence = np.zeros((self._config.buffer_size // 4, self._config.channels), dtype=self._config.dtype)
                     self._write_audio(silence)
-
-                # Small sleep to prevent busy-waiting
-                time.sleep(0.001)
             else:
-                # Not playing, wait a bit longer
+                # Not playing, wait a bit
                 time.sleep(0.01)
 
-        logger.debug("Output thread stopped")
+        logger.debug("Audio output thread stopped")
 
     def _write_audio(self, data: np.ndarray):
         """Write PCM data to the AudioTrack.
 
         Converts the numpy array to bytes and writes to the AudioTrack.
+        Uses blocking write which will wait until the buffer has space.
 
         Args:
             data: Audio data as numpy array
@@ -154,7 +158,13 @@ class AndroidSoundPlayer(BaseSoundPlayer):
         try:
             # Convert numpy array to bytes
             bytes_data = data.tobytes()
-            self._audiotrack.write(bytes_data, 0, len(bytes_data))
+
+            # Write in blocking mode - this will wait until there's space in the buffer
+            written = self._audiotrack.write(bytes_data, 0, len(bytes_data), 0)
+
+            if written < 0:
+                logger.warning(f"AudioTrack.write returned: {written}")
+
         except Exception as e:
             logger.error(f"Error writing to AudioTrack: {e}")
 
@@ -177,16 +187,15 @@ class AndroidSoundPlayer(BaseSoundPlayer):
         Stops playback and releases all AudioTrack resources.
         """
         logger.debug("Closing AudioTrack")
-        with self._lock:
-            if self._audiotrack:
-                try:
-                    if self._audiotrack.getPlayState() == 3:  # PLAYSTATE_PLAYING
-                        self._audiotrack.stop()
-                    self._audiotrack.release()
-                except Exception as e:
-                    logger.error(f"Error releasing AudioTrack: {e}")
-                finally:
-                    self._audiotrack = None
+        if self._audiotrack:
+            try:
+                if self._audiotrack.getPlayState() == 3:  # PLAYSTATE_PLAYING
+                    self._audiotrack.stop()
+                self._audiotrack.release()
+            except Exception as e:
+                logger.error(f"Error releasing AudioTrack: {e}")
+            finally:
+                self._audiotrack = None
 
     # Hooks for StatusMixin
     def _do_play(self):
@@ -195,7 +204,7 @@ class AndroidSoundPlayer(BaseSoundPlayer):
         if self._audiotrack is None:
             self._create_output_stream()
 
-        if self._audiotrack:
+        if self._audiotrack.getPlayState() != 3:  # Not PLAYING
             self._audiotrack.play()
             self._start_output_thread()
 
