@@ -48,16 +48,17 @@ class LinuxSoundPlayer(BaseSoundPlayer):
         by sounddevice whenever it needs more audio data.
         """
 
+        config = self.config
         logger.debug(
-            f"Creating sounddevice stream: {self.config.sample_rate}Hz, "
-            f"{self.config.channels}ch, {self.config.dtype}"
+            f"Creating sounddevice stream: {config.sample_rate}Hz, "
+            f"{config.channels}ch, {config.dtype}"
         )
 
         self._stream = sd.RawOutputStream(
-            samplerate=self.config.sample_rate,
-            channels=self.config.channels,
-            dtype=self.config.dtype,
-            blocksize=self.config.buffer_size,
+            samplerate=config.sample_rate,
+            channels=config.channels,
+            dtype=config.dtype,
+            blocksize=config.buffer_size,
             callback=self._audio_callback,
         )
 
@@ -80,11 +81,12 @@ class LinuxSoundPlayer(BaseSoundPlayer):
         chunk = self.get_next_chunk()
         if chunk is not None:
             # Reshape chunk to match output buffer shape (frames, channels)
-            if chunk.size == frames * self.config.channels:
-                outdata[:] = chunk.reshape(frames, self.config.channels)
+            config = self.config
+            if chunk.size == frames * config.channels:
+                outdata[:] = chunk.reshape(frames, config.channels)
             else:
                 # Handle size mismatch (shouldn't happen normally)
-                logger.warning(f"Chunk size mismatch: {chunk.size} vs {frames * self.config.channels}")
+                logger.warning(f"Chunk size mismatch: {chunk.size} vs {frames * config.channels}")
                 outdata[:] = 0
         else:
             # No audio data, output silence
