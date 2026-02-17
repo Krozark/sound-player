@@ -209,35 +209,35 @@ class BaseSoundPlayer(StatusMixin, AudioConfigMixin, ABC):
             Mixed audio buffer from all active layers with shape
             (config.buffer_size, config.channels)
         """
+        # Cache config lookups (called ~43 times/sec at 44100Hz/1024 buffer)
+        cfg = self.config
+        buffer_size = cfg.buffer_size
+        channels = cfg.channels
+        target_dtype = cfg.dtype
+
         active_layers = [layer for layer in self._audio_layers.values() if layer.status() == STATUS.PLAYING]
 
         if not active_layers:
-            return np.zeros(
-                (self.config.buffer_size, self.config.channels),
-                dtype=self.config.dtype,
-            )
+            return np.zeros((buffer_size, channels), dtype=target_dtype)
 
         # Mix all active layers
-        mixed = np.zeros(
-            (self.config.buffer_size, self.config.channels),
-            dtype=np.float32,
-        )
+        mixed = np.zeros((buffer_size, channels), dtype=np.float32)
 
+        master_vol = self.volume
         for layer in active_layers:
             chunk = layer.get_next_chunk()
             if chunk is not None and chunk.size > 0:
                 # Layer volume already applied by AudioLayer.mixer
-                # Apply player volume
-                mixed += chunk.astype(np.float32) * self.volume
+                # Avoid copy if already float32
+                if chunk.dtype == np.float32:
+                    mixed += chunk * master_vol
+                else:
+                    mixed += chunk.astype(np.float32) * master_vol
 
-        # Clip
-        mixed = np.clip(
-            mixed,
-            self.config.min_sample_value,
-            self.config.max_sample_value,
-        )
+        # Clip in-place to avoid allocation
+        np.clip(mixed, cfg.min_sample_value, cfg.max_sample_value, out=mixed)
 
-        return mixed.astype(self.config.dtype)
+        return mixed.astype(target_dtype)
 
     @abstractmethod
     def _create_output_stream(self):

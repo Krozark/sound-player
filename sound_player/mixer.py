@@ -35,6 +35,7 @@ class AudioMixer(LockMixin):
         super().__init__()
         self._owner = owner
         self._sounds: list[BaseSound] = []
+        self._silence: np.ndarray | None = None
 
     @property
     def config(self) -> AudioConfig:
@@ -106,25 +107,37 @@ class AudioMixer(LockMixin):
         if not active_sounds:
             return self._get_silence()
 
+        # Cache config lookups (avoid repeated property access in hot loop)
+        cfg = self.config
+        buffer_size = cfg.buffer_size
+        channels = cfg.channels
+        min_val = cfg.min_sample_value
+        max_val = cfg.max_sample_value
+        target_dtype = cfg.dtype
+
         # Initialize output buffer with zeros
-        mixed = np.zeros((self.config.buffer_size, self.config.channels), dtype=np.float32)
+        mixed = np.zeros((buffer_size, channels), dtype=np.float32)
 
         for sound in active_sounds:
             try:
-                chunk = sound.get_next_chunk(self.config.buffer_size)
+                chunk = sound.get_next_chunk(buffer_size)
                 if chunk is None or chunk.size == 0:
                     continue
 
                 # Apply individual sound volume (0.0-1.0)
-                chunk_float = chunk.astype(np.float32) * sound.volume
+                # Avoid copy if already float32
+                if chunk.dtype == np.float32:
+                    chunk_float = chunk * sound.volume
+                else:
+                    chunk_float = chunk.astype(np.float32) * sound.volume
 
                 # Handle channel mismatch
-                if chunk_float.shape[1] != self.config.channels:
-                    chunk_float = self._convert_channels(chunk_float, self.config.channels)
+                if chunk_float.shape[1] != channels:
+                    chunk_float = self._convert_channels(chunk_float, channels)
 
                 # Ensure chunk size matches buffer size
-                if chunk_float.shape[0] != self.config.buffer_size:
-                    chunk_float = self._adjust_length(chunk_float, self.config.buffer_size)
+                if chunk_float.shape[0] != buffer_size:
+                    chunk_float = self._adjust_length(chunk_float, buffer_size)
 
                 mixed += chunk_float
 
@@ -133,26 +146,25 @@ class AudioMixer(LockMixin):
                 continue
 
         # Apply master volume and clip to prevent overflow
-        mixed *= self.volume
-        mixed = np.clip(
-            mixed,
-            self.config.min_sample_value,
-            self.config.max_sample_value,
-        )
+        master_vol = self.volume
+        if master_vol != 1.0:
+            mixed *= master_vol
+        np.clip(mixed, min_val, max_val, out=mixed)
 
         # Convert back to target dtype
-        return mixed.astype(self.config.dtype)
+        return mixed.astype(target_dtype)
 
     def _get_silence(self) -> np.ndarray:
-        """Get a silent buffer.
+        """Get a silent buffer (cached).
 
         Returns:
             Silent audio buffer
         """
-        return np.zeros(
-            (self.config.buffer_size, self.config.channels),
-            dtype=self.config.dtype,
-        )
+        cfg = self.config
+        expected_shape = (cfg.buffer_size, cfg.channels)
+        if self._silence is None or self._silence.shape != expected_shape or self._silence.dtype != cfg.dtype:
+            self._silence = np.zeros(expected_shape, dtype=cfg.dtype)
+        return self._silence
 
     def _convert_channels(self, chunk: np.ndarray, target_channels: int) -> np.ndarray:
         """Convert audio chunk to target channel count.

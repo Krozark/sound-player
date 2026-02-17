@@ -67,21 +67,22 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin):
             chunk = self._do_get_next_chunk(size)
 
             if chunk is not None:
+                # Fast path: skip fade math when not fading and target is full volume
+                if self._fade_state == FadeState.NONE and self._fade_target_volume >= 0.999:
+                    return chunk
+
                 # Get sample-accurate fade multipliers for this chunk size
                 fade_map = self._get_fade_multiplier_array(len(chunk))
 
-                # Check if we actually need to apply math (optimization)
-                # If all multipliers are 1.0, we can skip multiplication
-                if not np.all(fade_map == 1.0):
-                    # Broadcast fade_map to match channels
-                    # fade_map is (N,), chunk is (N, Channels)
-                    # We add a new axis to fade_map to make it (N, 1) for broadcasting
+                # Apply fade: broadcast fade_map (N,) to chunk (N, Channels) via (N, 1)
+                if chunk.dtype == np.float32:
+                    chunk = (chunk * fade_map[:, np.newaxis]).astype(self.config.dtype)
+                else:
                     chunk = (chunk.astype(np.float32) * fade_map[:, np.newaxis]).astype(self.config.dtype)
 
                 # Auto-stop logic:
                 # If fade finished (NONE) AND volume is effectively 0, stop playback
                 if self._fade_state == FadeState.NONE and self._fade_target_volume <= 0.001:
-                    # Double check the last sample of the map to be sure we are at 0
                     if fade_map[-1] <= 0.001:
                         self._status = STATUS.STOPPED
 
