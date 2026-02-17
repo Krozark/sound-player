@@ -5,7 +5,7 @@ import time
 
 import numpy as np
 
-from .mixins import STATUS, AudioConfigMixin, FadeMixin, StatusMixin
+from .mixins import STATUS, AudioConfigMixin, FadeMixin, FadeState, StatusMixin
 
 logger = logging.getLogger(__name__)
 
@@ -55,37 +55,36 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin):
         while self._status != STATUS.STOPPED and (timeout is None or start_timestamps + timeout < time.time()):
             time.sleep(0.1)
 
-    # PCM buffer interface for audio mixing
-
     def get_next_chunk(self, size: int) -> np.ndarray | None:
         """Return next audio chunk as numpy array.
 
-        This method is called by the AudioMixer to get the next chunk of
-        audio data for mixing. This implementation handles common logic
-        like checking playback status and thread safety, then delegates
-        to _do_get_next_chunk for platform-specific implementation.
-
-        Also applies fade multiplier if a fade operation is in progress.
-
-        Args:
-            size: Number of samples to return
-
-        Returns:
-            Audio data as numpy array with shape (size, channels)
-            Returns None if sound has ended or is not playing
+        This implementation handles sample-accurate fading and thread safety.
         """
         with self._lock:
             if self._status in (STATUS.STOPPED, STATUS.PAUSED):
                 return None
+
             chunk = self._do_get_next_chunk(size)
+
             if chunk is not None:
-                # Apply fade multiplier
-                fade_mult = self.get_fade_multiplier()
-                if fade_mult != 1.0:
-                    chunk = (chunk.astype(np.float32) * fade_mult).astype(self.config.dtype)
-                # Auto-stop if crossfade out completed
-                if self._fade_state.name == "NONE" and fade_mult <= 0.001:
-                    self._status = STATUS.STOPPED
+                # Get sample-accurate fade multipliers for this chunk size
+                fade_map = self._get_fade_multiplier_array(len(chunk))
+
+                # Check if we actually need to apply math (optimization)
+                # If all multipliers are 1.0, we can skip multiplication
+                if not np.all(fade_map == 1.0):
+                    # Broadcast fade_map to match channels
+                    # fade_map is (N,), chunk is (N, Channels)
+                    # We add a new axis to fade_map to make it (N, 1) for broadcasting
+                    chunk = (chunk.astype(np.float32) * fade_map[:, np.newaxis]).astype(self.config.dtype)
+
+                # Auto-stop logic:
+                # If fade finished (NONE) AND volume is effectively 0, stop playback
+                if self._fade_state == FadeState.NONE and self._fade_target_volume <= 0.001:
+                    # Double check the last sample of the map to be sure we are at 0
+                    if fade_map[-1] <= 0.001:
+                        self._status = STATUS.STOPPED
+
             return chunk
 
     def _do_get_next_chunk(self, size: int) -> np.ndarray | None:

@@ -1,9 +1,9 @@
 """Fade mixin for managing fade-in/fade-out effects."""
 
 import logging
-import math
-import time
 from enum import IntEnum
+
+import numpy as np
 
 from .volume import VolumeMixin
 
@@ -25,7 +25,7 @@ class FadeCurve(IntEnum):
     EXPONENTIAL = 1  # Power curve (more natural for audio)
     LOGARITHMIC = 2  # Logarithmic curve
     SCURVE = 3  # S-curve (ease-in-ease-out)
-    DEFAULT = LINEAR
+    DEFAULT = SCURVE
 
 
 class FadeMixin(VolumeMixin):
@@ -46,10 +46,10 @@ class FadeMixin(VolumeMixin):
         self._fade_curve = fade_curve
 
         self._fade_state = FadeState.NONE
-        self._fade_start_time = 0.0
-        self._fade_duration = 0.0
         self._fade_start_volume = 1.0
         self._fade_target_volume = 1.0
+        self._samples_processed = 0
+        self._total_fade_samples = 0
 
     def start_fade_in(self, duration: float, target_volume: float = 1.0) -> None:
         """Start a fade-in from 0 to target_volume over duration seconds.
@@ -64,10 +64,10 @@ class FadeMixin(VolumeMixin):
                 logger.debug("Fade duration <= 0, setting volume directly")
                 return
             self._fade_state = FadeState.FADING_IN
-            self._fade_start_time = time.time()
-            self._fade_duration = duration
             self._fade_start_volume = 0.0
             self._fade_target_volume = max(0.0, min(1.0, target_volume))
+            self._samples_processed = 0
+            self._total_fade_samples = int(duration * self.config.sample_rate) or 1  # Avoid division by zero
 
     def start_fade_out(self, duration: float, target_volume: float = 0.0) -> None:
         """Start a fade-out from current volume to target_volume.
@@ -82,66 +82,72 @@ class FadeMixin(VolumeMixin):
                 logger.debug("Fade duration <= 0, setting volume directly")
                 return
             self._fade_state = FadeState.FADING_OUT
-            self._fade_start_time = time.time()
-            self._fade_duration = duration
             self._fade_start_volume = self._volume
             self._fade_target_volume = max(0.0, min(1.0, target_volume))
+            self._samples_processed = 0
+            # Calculate fade progress based on samples
+            self._total_fade_samples = int(duration * self.config.sample_rate) or 1  # Avoid division by zero
 
-    def get_fade_multiplier(self) -> float:
-        """Get current fade multiplier based on elapsed time.
+    def _get_fade_multiplier_array(self, size: int) -> np.ndarray:
+        """Calculate the fade multiplier array for the current chunk.
 
-        Returns:
-            Current fade multiplier (0.0-1.0). Returns 1.0 if not fading.
+        Uses sample counting instead of time.time() for sample-accurate transitions.
         """
         with self._lock:
+            # If no fade, return full target volume array (usually 1.0 or target)
             if self._fade_state == FadeState.NONE:
-                return 1.0
+                return np.full(size, self._fade_target_volume, dtype=np.float32)
 
-            elapsed = time.time() - self._fade_start_time
-            progress = min(1.0, max(0.0, elapsed / self._fade_duration))
+            start_pos = self._samples_processed
+            end_pos = start_pos + size
 
-            # Apply curve
-            curved_progress = self._apply_curve(progress)
+            # Generate linear progress ramp (0.0 to 1.0) for this specific chunk
+            # We map the sample range [start_pos, end_pos] to the fade progress
+            progress_steps = np.linspace(start_pos / self._total_fade_samples, end_pos / self._total_fade_samples, size)
 
-            # Calculate multiplier based on fade direction
-            if self._fade_state == FadeState.FADING_IN:
-                multiplier = (
-                    self._fade_start_volume + (self._fade_target_volume - self._fade_start_volume) * curved_progress
-                )
-            else:  # FADING_OUT
-                multiplier = (
-                    self._fade_start_volume + (self._fade_target_volume - self._fade_start_volume) * curved_progress
-                )
+            # Clamp progress between 0.0 and 1.0
+            progress_steps = np.clip(progress_steps, 0.0, 1.0)
 
-            # Check if fade is complete
-            if progress >= 1.0:
+            # Apply the selected curve (Vectorized)
+            curved_progress = self._apply_curve_vectorized(progress_steps)
+
+            # Calculate actual volume multipliers: Start + (Diff * Progress)
+            multipliers = (
+                self._fade_start_volume + (self._fade_target_volume - self._fade_start_volume) * curved_progress
+            )
+
+            # Update internal counter
+            self._samples_processed += size
+
+            # Check if fade is complete (if the end of this chunk reached 100%)
+            if (end_pos / self._total_fade_samples) >= 1.0:
                 self._fade_state = FadeState.NONE
+                self._samples_processed = 0  # Reset for next fade
 
-            return max(0.0, min(1.0, multiplier))
+                # Force the end of the buffer to exact target volume to avoid floating point drift
+                multipliers[-1] = self._fade_target_volume
 
-    def _apply_curve(self, progress: float) -> float:
-        """Apply fade curve to progress (0.0-1.0).
+            return multipliers.astype(np.float32)
 
-        Args:
-            progress: Linear progress value (0.0-1.0)
+    def _apply_curve_vectorized(self, progress: np.ndarray) -> np.ndarray:
+        """Apply fade curve to a numpy array of progress values (0.0-1.0).
 
-        Returns:
-            Curved progress value (0.0-1.0)
+        Vectorized version for high-performance buffer processing.
         """
         if self._fade_curve == FadeCurve.EXPONENTIAL:
-            # Power curve for more natural audio fade
-            return progress**2
-            # if progress <= 0: return 0.0
-            # return (math.pow(10, progress) - 1) / 9
+            # Power curve (x^2) - smoother natural fade
+            return np.power(progress, 2)
         elif self._fade_curve == FadeCurve.LOGARITHMIC:
-            # Logarithmic curve (using base-10 log)
-            # Map 0-1 to 1-10, apply log10, then map back to 0-1
-            return math.log10(1 + progress * 9) / math.log10(10)
-            # return math.sin(progress * (math.pi / 2))
+            # Equal Power approximation using Sine window
+            # Best for crossfades to maintain constant energy
+            return np.sin(progress * (np.pi / 2))
         elif self._fade_curve == FadeCurve.SCURVE:
-            # Smooth step function (ease-in-ease-out)
+            # Smoothstep (3x^2 - 2x^3)
+            # Standard easing function for polished feel
             return progress * progress * (3 - 2 * progress)
-        return progress  # LINEAR
+
+        # Default: LINEAR
+        return progress
 
     def set_fade_curve(self, curve: FadeCurve) -> None:
         """Set the fade curve type.
@@ -163,6 +169,7 @@ class FadeMixin(VolumeMixin):
         """Get the current fade curve type."""
         return self._fade_curve
 
+    @property
     def is_fading(self) -> bool:
         """Check if currently fading in or out.
 

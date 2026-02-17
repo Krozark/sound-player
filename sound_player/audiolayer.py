@@ -243,7 +243,7 @@ class AudioLayer(StatusMixin, AudioConfigMixin):
                         i = 0
                         while i < len(self._fading_out_sounds):
                             sound = self._fading_out_sounds[i]
-                            if sound.status() == STATUS.STOPPED or not sound.is_fading():
+                            if sound.status() == STATUS.STOPPED or not sound.is_fading:
                                 self._fading_out_sounds.pop(i)
                                 logger.debug("Crossfade sound %s completed. Remove it", sound)
                                 self._mixer.remove_sound(sound)

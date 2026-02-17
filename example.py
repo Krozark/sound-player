@@ -388,8 +388,8 @@ def main(verbosity: int = 0):
     # test_volume_controls()
     # test_loop_functionality()
     # test_audio_configuration()
-    test_manual_fade()
-    # test_crossfade()
+    # test_manual_fade()
+    test_crossfade()
 
     print("\n" + "=" * 50)
     print("All examples completed!")

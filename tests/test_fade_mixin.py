@@ -52,7 +52,7 @@ class TestFadeMixin:
         """Test that FadeMixin initializes with NONE fade state."""
         obj = ConcreteFadeMixin()
         assert obj.fade_state == FadeState.NONE
-        assert not obj.is_fading()
+        assert not obj.is_fading
 
     def test_initial_fade_curve_is_linear(self):
         """Test that FadeMixin initializes with LINEAR fade curve."""
@@ -70,7 +70,7 @@ class TestFadeMixin:
         obj = ConcreteFadeMixin()
         obj.start_fade_in(1.0, 0.5)
         assert obj.fade_state == FadeState.FADING_IN
-        assert obj.is_fading()
+        assert obj.is_fading
 
     def test_start_fade_out(self):
         """Test starting a fade-out."""
@@ -78,7 +78,7 @@ class TestFadeMixin:
         obj.set_volume(0.8)
         obj.start_fade_out(1.0, 0.0)
         assert obj.fade_state == FadeState.FADING_OUT
-        assert obj.is_fading()
+        assert obj.is_fading
 
     def test_fade_multiplier_no_fade(self):
         """Test that fade multiplier is 1.0 when not fading."""
