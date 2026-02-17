@@ -322,10 +322,12 @@ Configuration for audio format.
 Add the following to your `buildozer.spec` requirements:
 
 ```
-requirements = ..., krozark-current-platform, sound-player~=1.0, numpy, pyjnius, android
+requirements = ..., sound-player[android]~=1.0
 ```
 
-`soundfile` and `sounddevice` are **not** needed on Android — the library uses
+The `[android]` extra pulls in `pyjnius` and `android`; `numpy` and
+`krozark-current-platform` are pulled in automatically as hard dependencies.
+`soundfile` and `sounddevice` are **not** needed — the library uses
 `MediaExtractor` / `MediaCodec` / `AudioTrack` directly via `pyjnius`.
 
 ### Choosing the Android decoder
