@@ -18,6 +18,10 @@ logger = logging.getLogger(__name__)
 try:
     from jnius import autoclass
 
+    AudioTrack = autoclass("android.media.AudioTrack")
+    AudioAttributesBuilder = autoclass("android.media.AudioAttributes$Builder")
+    AudioFormatBuilder = autoclass("android.media.AudioFormat$Builder")
+
     ANDROID_AVAILABLE = True
 except Exception:
     ANDROID_AVAILABLE = False
@@ -77,10 +81,6 @@ class AndroidSoundPlayer(BaseSoundPlayer):
             return
 
         try:
-            AudioTrack = autoclass("android.media.AudioTrack")
-            AudioAttributesBuilder = autoclass("android.media.AudioAttributes$Builder")
-            AudioFormatBuilder = autoclass("android.media.AudioFormat$Builder")
-
             config = self.config
             logger.debug(
                 f"Creating AudioTrack: {config.sample_rate}Hz, {config.channels}ch, {config.dtype}"

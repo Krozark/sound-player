@@ -21,6 +21,11 @@ logger = logging.getLogger(__name__)
 try:
     from jnius import PythonJavaClass, autoclass, java_method
 
+    MediaExtractor = autoclass("android.media.MediaExtractor")
+    MediaFormat = autoclass("android.media.MediaFormat")
+    MediaCodec = autoclass("android.media.MediaCodec")
+    MediaCodecBufferInfo = autoclass("android.media.MediaCodec$BufferInfo")
+
     ANDROID_AVAILABLE = True
 except Exception:
     ANDROID_AVAILABLE = False
@@ -129,10 +134,6 @@ class AndroidPCMSound(BaseSound):
     def _start_decoding(self):
         """Initialize and start the decoder."""
         try:
-            MediaExtractor = autoclass("android.media.MediaExtractor")
-            MediaFormat = autoclass("android.media.MediaFormat")
-            MediaCodec = autoclass("android.media.MediaCodec")
-
             # Create extractor
             self._extractor = MediaExtractor()
             self._extractor.setDataSource(self._filepath)
@@ -195,7 +196,6 @@ class AndroidPCMSound(BaseSound):
         """Background thread that decodes audio data."""
         logger.debug("Decode thread started")
 
-        MediaCodec = autoclass("android.media.MediaCodec")
         BUFFER_FLAG_END_OF_STREAM = 4
 
         try:
@@ -239,7 +239,7 @@ class AndroidPCMSound(BaseSound):
                         self._extractor.advance()
 
                 # Get decoded output
-                buffer_info = autoclass("android.media.MediaCodec$BufferInfo")()
+                buffer_info = MediaCodecBufferInfo()
                 output_buffer_id = self._codec.dequeueOutputBuffer(buffer_info, 10000)
 
                 if output_buffer_id >= 0:
@@ -424,7 +424,6 @@ class AndroidPCMSound(BaseSound):
         self._release_decoder()
 
         try:
-            MediaExtractor = autoclass("android.media.MediaExtractor")
             self._extractor = MediaExtractor()
             self._extractor.setDataSource(self._filepath)
 
