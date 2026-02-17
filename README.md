@@ -315,18 +315,62 @@ Configuration for audio format.
 | `buffer_size` | Samples per buffer (default: 1024) |
 | `dtype` | NumPy dtype (default: np.int16) |
 
+## Android
+
+### Buildozer / python-for-android
+
+Add the following to your `buildozer.spec` requirements:
+
+```
+requirements = ..., krozark-current-platform, sound-player~=1.0, numpy, pyjnius, android
+```
+
+`soundfile` and `sounddevice` are **not** needed on Android — the library uses
+`MediaExtractor` / `MediaCodec` / `AudioTrack` directly via `pyjnius`.
+
+### Choosing the Android decoder
+
+Two decoder implementations are available.  Select one at **runtime** by
+setting the `SOUND_PLAYER_ANDROID_DECODER` environment variable **before the
+first import** of `sound_player`:
+
+```python
+import os
+os.environ["SOUND_PLAYER_ANDROID_DECODER"] = "sync"   # default
+# or
+os.environ["SOUND_PLAYER_ANDROID_DECODER"] = "async"
+
+import sound_player
+```
+
+| Value | Class | How it works |
+|-------|-------|--------------|
+| `sync` *(default)* | `AndroidPCMSound` | Background Python thread polls `dequeueInputBuffer` / `dequeueOutputBuffer`. Backpressure pauses the thread when the PCM buffer holds > 2 s of audio. Simple and easy to debug. |
+| `async` | `AndroidPCMSoundAsync` | Registers a `MediaCodec.Callback`; Android's internal thread calls into Python when buffers are ready. Event-driven, no polling. |
+
+**Recommendation:** use `sync` (the default) for most cases, especially when
+playing many sounds concurrently (~10+).  The `async` mode is provided for
+experimentation; its backpressure currently blocks MediaCodec's internal
+thread, which is an anti-pattern at scale.
+
 ## Dependencies
 
 **Required:**
 - `numpy>=1.24` - Audio mixing
-- `soundfile~=0.12` - Audio file decoding
 - `krozark-current-platform` - Platform detection
 
 **Optional (Linux/Windows):**
-- `sounddevice~=0.4` - Audio output (install with `[linux]` or `[windows]` extra)
+- `sounddevice~=0.4` - Audio output
+- `soundfile~=0.12` - Audio file decoding
+
+Install both with:
+```bash
+pip install sound-player[linux]   # Linux
+pip install sound-player[windows] # Windows
+```
 
 **Android:**
-- `jnius`, `android` - Available on Android platform
+- `pyjnius`, `android` - Android platform APIs (already available in python-for-android environments)
 
 ## License
 
