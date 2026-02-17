@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sound-player"
-version = "1.0.0"
+version = "1.0.1"
 description = "The aim of this project is to create multi audio layer player with professional audio mixing"
 readme = "README.md"
 license = "BSD-2-Clause"
