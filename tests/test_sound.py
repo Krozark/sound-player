@@ -2,33 +2,9 @@
 
 import pytest
 
-from sound_player.core.base_sound import BaseSound
 from sound_player.core.mixins import STATUS
 
-
-class MockSound(BaseSound):
-    """Mock implementation of BaseSound for testing."""
-
-    def __init__(self, filepath, config=None, loop=None, volume=1.0):
-        # BaseSound.__init__ is (filepath, loop=None, *args, **kwargs)
-        # So we need to pass loop as positional arg after filepath
-        # config and volume go in **kwargs to avoid passing volume twice
-        super().__init__(filepath, loop, config=config, volume=volume)
-        self.do_play_called = False
-        self.do_pause_called = False
-        self.do_stop_called = False
-
-    def _do_play(self):
-        self.do_play_called = True
-
-    def _do_pause(self):
-        self.do_pause_called = True
-
-    def _do_stop(self):
-        self.do_stop_called = True
-
-    def _do_seek(self):
-        pass
+from .mock_class import MockSound
 
 
 class TestBaseSoundInit:

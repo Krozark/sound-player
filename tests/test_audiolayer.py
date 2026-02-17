@@ -2,10 +2,11 @@
 
 import time
 from collections import deque
-from unittest.mock import MagicMock
 
 from sound_player.audiolayer import AudioLayer
 from sound_player.core.mixins import STATUS
+
+from .mock_class import create_mock_sound
 
 
 class TestAudioLayerInit:
@@ -212,24 +213,14 @@ class TestAudioLayerStop:
         layer.stop()
         assert layer.status() == STATUS.STOPPED
 
-    def test_stop_stops_current_sounds(self, mock_sound):
+    def test_stop_stops_current_sounds(self):
         """Test that stop stops all current sounds."""
-
         layer = AudioLayer()
         layer.play()  # Set status to PLAYING
 
         # Create sounds that return PLAYING status so thread doesn't remove them
-        sound1 = MagicMock()
-        sound1._loop = None
-        sound1.volume = None
-        sound1.status.return_value = STATUS.PLAYING
-        sound1.stop = MagicMock()
-
-        sound2 = MagicMock()
-        sound2._loop = None
-        sound2.volume = None
-        sound2.status.return_value = STATUS.PLAYING
-        sound2.stop = MagicMock()
+        sound1 = create_mock_sound(status=STATUS.PLAYING)
+        sound2 = create_mock_sound(status=STATUS.PLAYING)
 
         layer._queue_current.extend([sound1, sound2])
         layer.stop()
@@ -262,29 +253,12 @@ class TestAudioLayerStop:
 class TestAudioLayerThreading:
     """Tests for AudioLayer threading behavior."""
 
-    def test_thread_starts_sounds_from_waiting(self, wait_for_thread_stop):
+    def test_thread_starts_sounds_from_waiting(self, mock_sound, wait_for_thread_stop):
         """Test that thread moves sounds from waiting to current queue."""
-        # Create real mock sounds that start PLAYING after play() is called
-
         layer = AudioLayer(concurrency=2)
 
-        sound1 = MagicMock()
-        sound1._loop = None
-        sound1._volume = None
-        sound1.status.return_value = STATUS.PLAYING  # Will be PLAYING after play()
-        sound1.play = MagicMock()
-        sound1.stop = MagicMock()
-        sound1.set_loop = MagicMock()
-        sound1.set_volume = MagicMock()
-
-        sound2 = MagicMock()
-        sound2._loop = None
-        sound2._volume = None
-        sound2.status.return_value = STATUS.PLAYING
-        sound2.play = MagicMock()
-        sound2.stop = MagicMock()
-        sound2.set_loop = MagicMock()
-        sound2.set_volume = MagicMock()
+        sound1 = mock_sound(status=STATUS.PLAYING)
+        sound2 = mock_sound(status=STATUS.PLAYING)
 
         layer.enqueue(sound1)
         layer.enqueue(sound2)
@@ -302,22 +276,11 @@ class TestAudioLayerThreading:
         layer.stop()
         wait_for_thread_stop(layer)
 
-    def test_thread_respects_concurrency_limit(self, wait_for_thread_stop):
+    def test_thread_respects_concurrency_limit(self, mock_sound, wait_for_thread_stop):
         """Test that thread respects concurrency limit."""
-
         layer = AudioLayer(concurrency=2)
 
-        sounds = []
-        for _ in range(4):
-            sound = MagicMock()
-            sound._loop = None
-            sound._volume = None
-            sound.status.return_value = STATUS.PLAYING
-            sound.play = MagicMock()
-            sound.stop = MagicMock()
-            sound.set_loop = MagicMock()
-            sound.set_volume = MagicMock()
-            sounds.append(sound)
+        sounds = [mock_sound(status=STATUS.PLAYING) for _ in range(4)]
 
         for sound in sounds:
             layer.enqueue(sound)
@@ -334,31 +297,13 @@ class TestAudioLayerThreading:
         layer.stop()
         wait_for_thread_stop(layer)
 
-    def test_thread_removes_stopped_sounds(self, wait_for_thread_stop):
+    def test_thread_removes_stopped_sounds(self, mock_sound, wait_for_thread_stop):
         """Test that thread removes stopped sounds from current queue."""
-
         layer = AudioLayer(concurrency=3)
 
-        sound1 = MagicMock()
-        sound1._loop = None
-        sound1._volume = None
-        sound1.status.return_value = STATUS.PLAYING
-        sound1.play = MagicMock()
-        sound1.stop = MagicMock()
-
-        sound2 = MagicMock()
-        sound2._loop = None
-        sound2._volume = None
-        sound2.status.return_value = STATUS.STOPPED  # Already stopped
-        sound2.play = MagicMock()
-        sound2.stop = MagicMock()
-
-        sound3 = MagicMock()
-        sound3._loop = None
-        sound3._volume = None
-        sound3.status.return_value = STATUS.PLAYING
-        sound3.play = MagicMock()
-        sound3.stop = MagicMock()
+        sound1 = mock_sound(status=STATUS.PLAYING)
+        sound2 = mock_sound(status=STATUS.STOPPED)  # Already stopped
+        sound3 = mock_sound(status=STATUS.PLAYING)
 
         layer._queue_current.extend([sound1, sound2, sound3])
         layer.play()
@@ -373,42 +318,14 @@ class TestAudioLayerThreading:
         layer.stop()
         wait_for_thread_stop(layer)
 
-    def test_replace_mode_stops_oldest_sounds(self, wait_for_thread_stop):
+    def test_replace_mode_stops_oldest_sounds(self, mock_sound, wait_for_thread_stop):
         """Test that replace mode stops oldest sounds when limit exceeded."""
-
         layer = AudioLayer(concurrency=2, replace=True)
 
-        sound1 = MagicMock()
-        sound1._loop = None
-        sound1._volume = None
-        sound1.status.return_value = STATUS.PLAYING
-        sound1.play = MagicMock()
-        sound1.stop = MagicMock()
-
-        sound2 = MagicMock()
-        sound2._loop = None
-        sound2._volume = None
-        sound2.status.return_value = STATUS.PLAYING
-        sound2.play = MagicMock()
-        sound2.stop = MagicMock()
-
-        sound3 = MagicMock()
-        sound3._loop = None
-        sound3._volume = None
-        sound3.status.return_value = STATUS.STOPPED
-        sound3.play = MagicMock()
-        sound3.stop = MagicMock()
-        sound3.set_loop = MagicMock()
-        sound3.set_volume = MagicMock()
-
-        sound4 = MagicMock()
-        sound4._loop = None
-        sound4._volume = None
-        sound4.status.return_value = STATUS.STOPPED
-        sound4.play = MagicMock()
-        sound4.stop = MagicMock()
-        sound4.set_loop = MagicMock()
-        sound4.set_volume = MagicMock()
+        sound1 = mock_sound(status=STATUS.PLAYING)
+        sound2 = mock_sound(status=STATUS.PLAYING)
+        sound3 = mock_sound(status=STATUS.STOPPED)
+        sound4 = mock_sound(status=STATUS.STOPPED)
 
         layer._queue_current.extend([sound1, sound2])
         layer.enqueue(sound3)
@@ -426,25 +343,13 @@ class TestAudioLayerThreading:
         layer.stop()
         wait_for_thread_stop(layer)
 
-    def test_thread_starts_next_sound_after_previous_stops(self, wait_for_thread_stop):
+    def test_thread_starts_next_sound_after_previous_stops(self, mock_sound, wait_for_thread_stop):
         """Test that thread starts next sound after previous one stops."""
-
         layer = AudioLayer(concurrency=1)
 
-        sound1 = MagicMock()
-        sound1._loop = None
-        sound1._volume = None
         # Start as PLAYING, will change to STOPPED later
-        sound1.status.return_value = STATUS.PLAYING
-        sound1.play = MagicMock()
-
-        sound2 = MagicMock()
-        sound2._loop = None
-        sound2._volume = None
-        sound2.status.return_value = STATUS.PLAYING
-        sound2.play = MagicMock()
-        sound2.set_loop = MagicMock()
-        sound2.set_volume = MagicMock()
+        sound1 = mock_sound(status=STATUS.PLAYING)
+        sound2 = mock_sound(status=STATUS.PLAYING)
 
         layer._queue_current.append(sound1)
         layer.enqueue(sound2)

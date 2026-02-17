@@ -1,6 +1,8 @@
 """Tests for common.py - STATUS enum and StatusMixin class."""
 
-from sound_player.core import STATUS, StatusMixin
+from sound_player.core import STATUS
+
+from .mock_class import ConcreteStatusMixin
 
 
 class TestStatusEnum:
@@ -18,19 +20,6 @@ class TestStatusEnum:
         assert STATUS.PLAYING == STATUS.PLAYING
         assert STATUS.PLAYING != STATUS.PAUSED
         assert STATUS.STOPPED != STATUS.PLAYING
-
-
-class ConcreteStatusMixin(StatusMixin):
-    """Concrete implementation of StatusMixin for testing."""
-
-    def _do_play(self):
-        pass
-
-    def _do_pause(self):
-        pass
-
-    def _do_stop(self):
-        pass
 
 
 class TestStatusMixin:
