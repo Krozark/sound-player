@@ -15,6 +15,7 @@ import soundfile as sf
 
 from sound_player.core.base_sound import BaseSound
 from sound_player.core.constants import MAX_INT16, MAX_INT32
+from sound_player.core.mixins import STATUS
 
 logger = logging.getLogger(__name__)
 
@@ -90,11 +91,11 @@ class LinuxPCMSound(BaseSound):
         Returns:
             Audio data as numpy array
         """
-        if self._file_is_float and self._config.dtype in ("int16", "int32"):
+        if self._file_is_float and self._config.dtype in (np.dtype(np.int16), np.dtype(np.int32)):
             # Read as float first, then convert
             data = self._sound_file.read(frames, dtype="float32")
             # Convert float [-1, 1] to integer range
-            if self._config.dtype == "int16":
+            if self._config.dtype == np.int16:
                 data = (data * MAX_INT16).astype(np.int16)
             else:  # int32
                 data = (data * MAX_INT32).astype(np.int32)
@@ -189,7 +190,9 @@ class LinuxPCMSound(BaseSound):
                     self._position = len(extra)
             else:
                 # No more loops - sound is finished
-                self.stop()
+                # Set status directly since we're already inside the lock from get_next_chunk()
+                self._do_stop()
+                self._status = STATUS.STOPPED
                 return None
 
         # Ensure shape is (size, channels)
@@ -228,7 +231,9 @@ class LinuxPCMSound(BaseSound):
                             self._position = len(extra)
                     else:
                         # No more loops - sound is finished
-                        self.stop()
+                        # Set status directly since we're already inside the lock from get_next_chunk()
+                        self._do_stop()
+                        self._status = STATUS.STOPPED
                         break
 
                 # Convert channels if needed

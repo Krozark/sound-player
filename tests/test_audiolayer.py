@@ -1,6 +1,7 @@
 """Tests for AudioLayer class."""
 
 import time
+from collections import deque
 from unittest.mock import MagicMock
 
 from sound_player.audiolayer import AudioLayer
@@ -17,7 +18,7 @@ class TestAudioLayerInit:
         assert layer._replace_on_add is False
         assert layer._loop is None
         assert layer.volume == 1.0
-        assert layer._queue_waiting == []
+        assert layer._queue_waiting == deque()
         assert layer._queue_current == []
         assert layer._thread is None
         assert layer.status() == STATUS.STOPPED
@@ -70,33 +71,36 @@ class TestAudioLayerEnqueue:
         assert len(layer._queue_waiting) == 1
         assert layer._queue_waiting[0] == sound
 
-    def test_enqueue_applies_loop_from_sound(self, mock_sound):
-        """Test that enqueue applies loop from sound if set."""
+    def test_enqueue_preserves_sound_loop_when_layer_has_no_default(self, mock_sound):
+        """Test that enqueue does not override sound loop when layer loop is None."""
         layer = AudioLayer()
         sound = mock_sound(loop=3)
         layer.enqueue(sound)
-        sound.set_loop.assert_called_once_with(3)
+        sound.set_loop.assert_not_called()
 
     def test_enqueue_applies_loop_from_layer(self, mock_sound):
-        """Test that enqueue applies loop from layer if sound loop not set."""
+        """Test that enqueue applies loop from layer when layer loop is set."""
         layer = AudioLayer(loop=2)
         sound = mock_sound(loop=None)
         layer.enqueue(sound)
         sound.set_loop.assert_called_once_with(2)
 
-    def test_enqueue_applies_volume_from_sound(self, mock_sound):
-        """Test that enqueue applies volume from sound if set."""
+    def test_enqueue_preserves_sound_volume(self, mock_sound):
+        """Test that enqueue does not override sound volume (layer volume applies at mixer level)."""
         layer = AudioLayer()
         sound = mock_sound(volume=0.6)
         layer.enqueue(sound)
-        sound.set_volume.assert_called_once_with(0.6)
+        sound.set_volume.assert_not_called()
 
-    def test_enqueue_applies_volume_from_layer(self, mock_sound):
-        """Test that enqueue applies volume from layer if sound volume not set."""
+    def test_enqueue_layer_volume_applies_at_mixer_level(self, mock_sound):
+        """Test that layer volume is applied at mixer level, not overriding sound volume."""
         layer = AudioLayer(volume=0.8)
-        sound = mock_sound(volume=None)
+        sound = mock_sound(volume=0.5)
         layer.enqueue(sound)
-        sound.set_volume.assert_called_once_with(0.8)
+        # Sound volume should not be changed by layer — layer volume applies in mixer
+        sound.set_volume.assert_not_called()
+        # Layer volume should be accessible
+        assert layer.volume == 0.8
 
     def test_enqueue_multiple_sounds(self, mock_sound):
         """Test enqueueing multiple sounds."""

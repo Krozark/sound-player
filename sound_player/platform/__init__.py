@@ -15,7 +15,8 @@ __all__ = [
 ]
 
 
-if platform == "linux":
+if platform in ("linux", "windows"):
+    # Linux and Windows share the same sounddevice/soundfile-based implementation
     from .linux import LinuxPCMSound as Sound
     from .linux import LinuxSoundPlayer as SoundPlayer
 elif platform == "android":

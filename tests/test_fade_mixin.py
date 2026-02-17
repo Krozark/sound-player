@@ -1,11 +1,12 @@
 """Tests for FadeMixin class."""
 
-import time
+import numpy as np
 
-from sound_player.core import FadeCurve, FadeMixin, FadeState, StatusMixin
+from sound_player.core import AudioConfig, FadeCurve, FadeMixin, FadeState, StatusMixin
+from sound_player.core.mixins import AudioConfigMixin
 
 
-class ConcreteFadeMixin(StatusMixin, FadeMixin):
+class ConcreteFadeMixin(StatusMixin, AudioConfigMixin, FadeMixin):
     """Concrete implementation of FadeMixin for testing."""
 
     def _do_play(self):
@@ -44,6 +45,10 @@ class TestFadeCurve:
         assert FadeCurve.LOGARITHMIC.value == 2
         assert FadeCurve.SCURVE.value == 3
 
+    def test_default_curve_is_scurve(self):
+        """Test that the default fade curve is SCURVE."""
+        assert FadeCurve.DEFAULT == FadeCurve.SCURVE
+
 
 class TestFadeMixin:
     """Tests for the FadeMixin class."""
@@ -54,10 +59,10 @@ class TestFadeMixin:
         assert obj.fade_state == FadeState.NONE
         assert not obj.is_fading
 
-    def test_initial_fade_curve_is_linear(self):
-        """Test that FadeMixin initializes with LINEAR fade curve."""
+    def test_initial_fade_curve_is_scurve(self):
+        """Test that FadeMixin initializes with SCURVE (DEFAULT) fade curve."""
         obj = ConcreteFadeMixin()
-        assert obj.fade_curve == FadeCurve.LINEAR
+        assert obj.fade_curve == FadeCurve.SCURVE
 
     def test_set_fade_curve_enum(self):
         """Test setting fade curve with enum."""
@@ -67,89 +72,107 @@ class TestFadeMixin:
 
     def test_start_fade_in(self):
         """Test starting a fade-in."""
-        obj = ConcreteFadeMixin()
+        obj = ConcreteFadeMixin(config=AudioConfig(sample_rate=44100))
         obj.start_fade_in(1.0, 0.5)
         assert obj.fade_state == FadeState.FADING_IN
         assert obj.is_fading
 
     def test_start_fade_out(self):
         """Test starting a fade-out."""
-        obj = ConcreteFadeMixin()
+        obj = ConcreteFadeMixin(config=AudioConfig(sample_rate=44100))
         obj.set_volume(0.8)
         obj.start_fade_out(1.0, 0.0)
         assert obj.fade_state == FadeState.FADING_OUT
         assert obj.is_fading
 
-    def test_fade_multiplier_no_fade(self):
-        """Test that fade multiplier is 1.0 when not fading."""
-        obj = ConcreteFadeMixin()
-        assert obj.get_fade_multiplier() == 1.0
+    def test_fade_multiplier_array_no_fade(self):
+        """Test that fade multiplier is target volume when not fading."""
+        obj = ConcreteFadeMixin(config=AudioConfig(sample_rate=44100))
+        multipliers = obj._get_fade_multiplier_array(512)
+        assert multipliers.shape == (512,)
+        # Default target volume is 1.0 when no fade has occurred
+        np.testing.assert_array_almost_equal(multipliers, np.ones(512))
 
-    def test_fade_multiplier_during_fade_in(self):
-        """Test fade multiplier during fade-in (approximately)."""
-        obj = ConcreteFadeMixin()
-        obj.start_fade_in(0.1, 1.0)
-        time.sleep(0.05)  # Halfway through
-        multiplier = obj.get_fade_multiplier()
-        # Should be approximately 0.5 (allowing for timing variance)
-        assert 0.3 < multiplier < 0.7
+    def test_fade_multiplier_array_during_fade_in(self):
+        """Test fade multiplier array during fade-in."""
+        config = AudioConfig(sample_rate=1000)  # 1000 samples/sec for easy math
+        obj = ConcreteFadeMixin(config=config, fade_curve=FadeCurve.LINEAR)
+        obj.start_fade_in(1.0, 1.0)  # 1 second fade-in = 1000 samples
+        # Get first 500 samples (first half of fade)
+        multipliers = obj._get_fade_multiplier_array(500)
+        # With linear curve, multipliers should ramp from 0 to ~0.5
+        assert multipliers[0] < 0.01  # Start near 0
+        assert 0.4 < multipliers[-1] < 0.6  # End near 0.5
 
-    def test_fade_multiplier_after_fade_complete(self):
-        """Test that fade multiplier returns to 1.0 after fade completes."""
-        obj = ConcreteFadeMixin()
-        obj.start_fade_in(0.05, 1.0)
-        time.sleep(0.1)  # Past completion
-        multiplier = obj.get_fade_multiplier()
-        assert multiplier == 1.0
+    def test_fade_multiplier_array_completes(self):
+        """Test that fade completes after total samples are consumed."""
+        config = AudioConfig(sample_rate=1000)
+        obj = ConcreteFadeMixin(config=config, fade_curve=FadeCurve.LINEAR)
+        obj.start_fade_in(0.1, 1.0)  # 100 samples total
+        # Consume all 100 samples in one chunk
+        multipliers = obj._get_fade_multiplier_array(100)
         assert obj.fade_state == FadeState.NONE
+        # Last value should be target volume
+        assert abs(multipliers[-1] - 1.0) < 0.01
 
-    def test_fade_multiplier_during_fade_out(self):
-        """Test fade multiplier during fade-out (approximately)."""
-        obj = ConcreteFadeMixin()
-        obj.set_volume(1.0)
-        obj.start_fade_out(0.1, 0.0)
-        time.sleep(0.05)  # Halfway through
-        multiplier = obj.get_fade_multiplier()
-        # Should be approximately 0.5 (allowing for timing variance)
-        assert 0.3 < multiplier < 0.7
+    def test_fade_multiplier_array_during_fade_out(self):
+        """Test fade multiplier array during fade-out."""
+        config = AudioConfig(sample_rate=1000)
+        obj = ConcreteFadeMixin(config=config, fade_curve=FadeCurve.LINEAR, volume=1.0)
+        obj.start_fade_out(1.0, 0.0)  # 1 second fade-out
+        # Get first 500 samples
+        multipliers = obj._get_fade_multiplier_array(500)
+        # Should ramp from 1.0 down to ~0.5
+        assert multipliers[0] > 0.9
+        assert 0.4 < multipliers[-1] < 0.6
 
-    def test_fade_curve_linear(self):
+    def test_apply_curve_vectorized_linear(self):
         """Test linear fade curve."""
         obj = ConcreteFadeMixin(fade_curve=FadeCurve.LINEAR)
-        # Check internal curve application
-        assert obj._apply_curve(0.0) == 0.0
-        assert obj._apply_curve(0.5) == 0.5
-        assert obj._apply_curve(1.0) == 1.0
+        progress = np.array([0.0, 0.25, 0.5, 0.75, 1.0], dtype=np.float32)
+        result = obj._apply_curve_vectorized(progress)
+        np.testing.assert_array_almost_equal(result, progress)
 
-    def test_fade_curve_exponential(self):
-        """Test exponential fade curve."""
+    def test_apply_curve_vectorized_exponential(self):
+        """Test exponential fade curve (x^2)."""
         obj = ConcreteFadeMixin(fade_curve=FadeCurve.EXPONENTIAL)
-        # Exponential curve should have different values
-        assert obj._apply_curve(0.0) == 0.0
-        assert obj._apply_curve(0.5) == 0.25  # 0.5^2
-        assert obj._apply_curve(1.0) == 1.0
+        progress = np.array([0.0, 0.5, 1.0], dtype=np.float32)
+        result = obj._apply_curve_vectorized(progress)
+        expected = np.array([0.0, 0.25, 1.0], dtype=np.float32)
+        np.testing.assert_array_almost_equal(result, expected)
         # Exponential should be lower than linear in the middle
-        assert obj._apply_curve(0.5) < 0.5
+        assert result[1] < 0.5
 
-    def test_fade_curve_scurve(self):
-        """Test s-curve fade curve."""
+    def test_apply_curve_vectorized_scurve(self):
+        """Test s-curve (smoothstep: 3x^2 - 2x^3)."""
         obj = ConcreteFadeMixin(fade_curve=FadeCurve.SCURVE)
-        # S-curve properties
-        assert obj._apply_curve(0.0) == 0.0
-        assert obj._apply_curve(1.0) == 1.0
-        # At 0.5, should be exactly 0.5 (symmetric)
-        assert abs(obj._apply_curve(0.5) - 0.5) < 0.01
+        progress = np.array([0.0, 0.5, 1.0], dtype=np.float32)
+        result = obj._apply_curve_vectorized(progress)
+        # Endpoints
+        assert abs(result[0] - 0.0) < 0.01
+        assert abs(result[2] - 1.0) < 0.01
+        # Symmetric: at 0.5, should be exactly 0.5
+        assert abs(result[1] - 0.5) < 0.01
+
+    def test_apply_curve_vectorized_logarithmic(self):
+        """Test logarithmic fade curve (sine-based equal power)."""
+        obj = ConcreteFadeMixin(fade_curve=FadeCurve.LOGARITHMIC)
+        progress = np.array([0.0, 0.5, 1.0], dtype=np.float32)
+        result = obj._apply_curve_vectorized(progress)
+        # Endpoints
+        assert abs(result[0] - 0.0) < 0.01
+        assert abs(result[2] - 1.0) < 0.01
+        # Logarithmic should be higher than linear in the middle
+        assert result[1] > 0.5
 
     def test_zero_duration_fade(self):
         """Test that zero duration fade doesn't start."""
-        obj = ConcreteFadeMixin()
+        obj = ConcreteFadeMixin(config=AudioConfig(sample_rate=44100))
         obj.start_fade_in(0.0, 1.0)
-        # Should not start fading with zero duration
         assert obj.fade_state == FadeState.NONE
 
     def test_negative_duration_fade(self):
         """Test that negative duration fade doesn't start."""
-        obj = ConcreteFadeMixin()
+        obj = ConcreteFadeMixin(config=AudioConfig(sample_rate=44100))
         obj.start_fade_in(-1.0, 1.0)
-        # Should not start fading with negative duration
         assert obj.fade_state == FadeState.NONE

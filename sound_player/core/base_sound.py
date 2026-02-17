@@ -51,8 +51,8 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin):
             timeout: Maximum time to wait in seconds, None for unlimited
         """
         logger.debug("BaseSound.wait()")
-        start_timestamps = time.time()
-        while self._status != STATUS.STOPPED and (timeout is None or start_timestamps + timeout < time.time()):
+        start_time = time.time()
+        while self._status != STATUS.STOPPED and (timeout is None or time.time() - start_time < timeout):
             time.sleep(0.1)
 
     def get_next_chunk(self, size: int) -> np.ndarray | None:

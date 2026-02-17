@@ -65,7 +65,7 @@ class AndroidSoundPlayer(BaseSoundPlayer):
         super().__init__(config or AudioConfig())
         self._audiotrack = None
         self._output_thread = None
-        self._stop_output_thread = threading.Event()
+        self._stop_output_event = threading.Event()
 
     def _create_output_stream(self):
         """Create the AudioTrack for PCM output.
@@ -80,7 +80,6 @@ class AndroidSoundPlayer(BaseSoundPlayer):
             AudioTrack = autoclass("android.media.AudioTrack")
             AudioAttributesBuilder = autoclass("android.media.AudioAttributes$Builder")
             AudioFormatBuilder = autoclass("android.media.AudioFormat$Builder")
-            AudioManager = autoclass("android.media.AudioManager")
 
             logger.debug(
                 f"Creating AudioTrack: {self._config.sample_rate}Hz, {self._config.channels}ch, {self._config.dtype}"
@@ -128,7 +127,7 @@ class AndroidSoundPlayer(BaseSoundPlayer):
         """
         logger.debug("Audio output thread started")
 
-        while not self._stop_output_thread.is_set():
+        while not self._stop_output_event.is_set():
             if self._status == STATUS.PLAYING and self._audiotrack:
                 chunk = self.get_next_chunk()
                 if chunk is not None:
@@ -171,13 +170,13 @@ class AndroidSoundPlayer(BaseSoundPlayer):
     def _start_output_thread(self):
         """Start the background output thread."""
         if self._output_thread is None or not self._output_thread.is_alive():
-            self._stop_output_thread.clear()
+            self._stop_output_event.clear()
             self._output_thread = threading.Thread(target=self._output_thread_task, daemon=True, name="AudioOutput")
             self._output_thread.start()
 
-    def _stop_output_thread(self):
+    def _join_output_thread(self):
         """Stop the background output thread."""
-        self._stop_output_thread.set()
+        self._stop_output_event.set()
         if self._output_thread and self._output_thread.is_alive():
             self._output_thread.join(timeout=1.0)
 
@@ -217,10 +216,10 @@ class AndroidSoundPlayer(BaseSoundPlayer):
     def _do_stop(self):
         """Hook called when play status changes to STOPPED."""
         # Stop output thread and close AudioTrack
-        self._stop_output_thread()
+        self._join_output_thread()
         self._close_output_stream()
 
     def __del__(self):
         """Cleanup on deletion."""
-        self._stop_output_thread()
+        self._join_output_thread()
         self._close_output_stream()
