@@ -12,11 +12,13 @@ requires-python = ">=3.11"
 authors = [
     {name = "Maxime Barbier", email = "maxime.barbier1991+ava@gmail.com"},
 ]
-keywords = ["sound", "player", "audio", "mixing", "pcm"]
+keywords = ["sound", "player", "audio", "mixing", "pcm", "fade", "crossfade"]
 classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: Android",
 ]
 dependencies = [
     "krozark-current-platform",

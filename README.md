@@ -7,11 +7,13 @@ A Python library for playing multiple sound files with professional real-time au
 - **Real-time Audio Mixing** - Mix multiple audio streams simultaneously using NumPy
 - **Multiple Audio Layers** - Organize sounds into independent layers (music, SFX, voice, etc.)
 - **Volume Control** - Fine-grained volume at sound, layer, and master levels (all 0.0-1.0 float range)
+- **Fade Effects** - Sample-accurate fade-in/fade-out with configurable curves (linear, exponential, logarithmic, S-curve)
+- **Crossfade Support** - Smooth transitions between sounds in replace mode
 - **Concurrent Playback** - Configure how many sounds can play simultaneously per layer
 - **Loop Control** - Set sounds to loop infinitely or a specific number of times
-- **Replace Mode** - Optionally stop oldest sounds when concurrency limit is reached
-- **Cross-Platform** - Support for Linux, Android (Windows/macOS/iOS planned)
-- **Mixin Architecture** - Reusable mixins for status, volume, and configuration management
+- **Replace Mode** - Optionally stop or crossfade oldest sounds when concurrency limit is reached
+- **Cross-Platform** - Support for Linux, Windows, Android (macOS/iOS planned)
+- **Mixin Architecture** - Reusable mixins for status, volume, fade, and configuration management
 
 ## Installation
 
@@ -24,11 +26,16 @@ For Linux audio output support:
 pip install sound-player[linux]
 ```
 
+For Windows audio output support:
+```bash
+pip install sound-player[windows]
+```
+
 ## Supported Platforms
 
 - [x] Linux
+- [x] Windows
 - [x] Android
-- [ ] Windows (planned)
 - [ ] macOS (planned)
 - [ ] iOS (planned)
 
@@ -158,6 +165,17 @@ player["music"].enqueue(Sound("music.ogg"))
 player.play()
 ```
 
+### Fade Effects
+
+```python
+from sound_player import Sound
+
+sound = Sound("music.ogg")
+sound.play()
+sound.fade_in(2.0)     # Fade in over 2 seconds
+sound.fade_out(3.0)    # Fade out over 3 seconds (auto-stops when done)
+```
+
 ### Replace Mode
 
 When `replace=True`, adding sounds beyond the concurrency limit will stop the oldest sounds:
@@ -175,6 +193,21 @@ layer.enqueue(Sound("sfx3.wav"))  # Stops sfx1.wav
 layer.play()
 ```
 
+### Crossfade with Replace Mode
+
+When `replace=True` with a `fade_out_duration`, replaced sounds crossfade smoothly:
+
+```python
+from sound_player import AudioLayer, Sound
+
+layer = AudioLayer(concurrency=1, replace=True, fade_in_duration=1.0, fade_out_duration=2.0)
+
+layer.enqueue(Sound("track1.ogg"))
+layer.play()
+# When track2 is enqueued, track1 fades out over 2s while track2 fades in over 1s
+layer.enqueue(Sound("track2.ogg"))
+```
+
 ## Architecture
 
 The library uses a mixin-based architecture with the following key components:
@@ -183,6 +216,7 @@ The library uses a mixin-based architecture with the following key components:
 
 - **`StatusMixin`** - Manages playback status (STOPPED, PLAYING, PAUSED) with thread-safe `play()`, `pause()`, `stop()` methods
 - **`VolumeMixin`** - Provides volume control with clamping (0.0-1.0) and thread-safe `set_volume()`, `get_volume()` methods
+- **`FadeMixin`** - Sample-accurate fade-in/fade-out with configurable curves (linear, exponential, logarithmic, S-curve)
 - **`LockMixin`** - Provides thread-safe RLock for concurrent operations
 - **`AudioConfigMixin`** - Manages audio configuration (sample rate, channels, buffer size, etc.)
 
@@ -209,7 +243,7 @@ Main class for managing multiple audio layers.
 
 | Method | Description |
 |--------|-------------|
-| `create_audio_layer(id, **kwargs)` | Create a new audio layer |
+| `create_audio_layer(id, force=False, **kwargs)` | Create a new audio layer |
 | `enqueue(sound, layer_id)` | Add sound to a layer |
 | `play(layer_id=None)` | Start playback (all layers or specific) |
 | `pause(layer_id=None)` | Pause playback |
@@ -224,18 +258,20 @@ Manages a queue of sounds with mixing.
 
 | Constructor | Description |
 |------------|-------------|
-| `AudioLayer(concurrency=1, replace=False, loop=None, volume=1.0, config=None)` | Create audio layer |
+| `AudioLayer(concurrency=1, replace=False, loop=None, fade_in_duration=None, fade_out_duration=None, fade_curve=None, volume=1.0, config=None)` | Create audio layer |
 
 | Method | Description |
 |--------|-------------|
-| `enqueue(sound)` | Add sound to waiting queue |
+| `enqueue(sound, fade_in=None, fade_out=None)` | Add sound to waiting queue |
 | `play()` / `pause()` / `stop()` | Control playback |
 | `clear()` | Clear all queues |
 | `set_concurrency(n)` | Set max concurrent sounds |
 | `set_replace(bool)` | Enable/disable replace mode |
 | `set_loop(n)` | Set default loop count (-1=infinite) |
 | `set_volume(v)` | Set layer volume (0.0-1.0) |
-| `get_volume()` | Get layer volume (0.0-1.0) |
+| `set_fade_in_duration(d)` | Set default fade-in duration for enqueued sounds |
+| `set_fade_out_duration(d)` | Set default fade-out duration for enqueued sounds |
+| `set_fade_curve(curve)` | Set default fade curve for enqueued sounds |
 
 ### Sound
 
@@ -247,7 +283,8 @@ Represents a single sound file.
 | `wait(timeout=None)` | Wait for playback to finish |
 | `set_loop(n)` | Set loop count (-1=infinite) |
 | `set_volume(v)` | Set volume (0.0-1.0) |
-| `get_volume()` | Get volume (0.0-1.0) |
+| `fade_in(duration)` | Fade in over duration seconds |
+| `fade_out(duration)` | Fade out over duration seconds |
 | `seek(position)` | Seek to position (seconds) |
 
 ### AudioConfig
@@ -269,8 +306,8 @@ Configuration for audio format.
 - `soundfile~=0.12` - Audio file decoding
 - `krozark-current-platform` - Platform detection
 
-**Optional (Linux):**
-- `sounddevice~=0.4` - Audio output (install with `[linux]` extra)
+**Optional (Linux/Windows):**
+- `sounddevice~=0.4` - Audio output (install with `[linux]` or `[windows]` extra)
 
 **Android:**
 - `jnius`, `android` - Available on Android platform

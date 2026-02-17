@@ -17,15 +17,17 @@ This guide contains essential information for AI agents working on the **sound-p
 - **Real-time audio mixing** using NumPy
 - **Multiple audio layers** with independent volume control
 - **Concurrent playback** with configurable limits
+- **Fade effects** with configurable curves (linear, exponential, logarithmic, S-curve)
+- **Crossfade support** for smooth transitions between sounds in replace mode
 - **PCM buffer interface** for integrating with any audio output
-- **Cross-platform** architecture (Linux, Android, with more planned)
-- **Mixin architecture** - Reusable mixins for status, volume, and configuration management
+- **Cross-platform** architecture (Linux, Windows, Android, with more planned)
+- **Mixin architecture** - Reusable mixins for status, volume, fade, and configuration management
 
 ## Supported Platforms
 
 - [x] Linux
+- [x] Windows (shares Linux sounddevice/soundfile implementation)
 - [x] Android
-- [ ] Windows (planned)
 - [ ] macOS (planned)
 - [ ] iOS (planned)
 
@@ -38,12 +40,19 @@ sound-player/
 │   ├── core/              # Core module with base classes
 │   │   ├── __init__.py    # Core exports
 │   │   ├── audio_config.py # AudioConfig dataclass
-│   │   ├── mixins.py      # StatusMixin, VolumeMixin, LockMixin, AudioConfigMixin
+│   │   ├── constants.py   # Audio format constants (MAX_INT16, etc.)
+│   │   ├── mixins/        # Mixin package
+│   │   │   ├── __init__.py    # Mixin exports
+│   │   │   ├── lock.py        # LockMixin
+│   │   │   ├── volume.py      # VolumeMixin
+│   │   │   ├── status.py      # StatusMixin, STATUS enum
+│   │   │   ├── fade.py        # FadeMixin, FadeState, FadeCurve
+│   │   │   └── audio_config.py # AudioConfigMixin
 │   │   ├── base_sound.py  # BaseSound abstract class
 │   │   └── base_player.py # BaseSoundPlayer abstract class
 │   ├── platform/          # Platform-specific implementations
 │   │   ├── __init__.py    # Platform detection and exports
-│   │   ├── linux/         # Linux implementation
+│   │   ├── linux/         # Linux/Windows implementation
 │   │   │   ├── __init__.py
 │   │   │   ├── sound.py   # LinuxPCMSound (soundfile decoding)
 │   │   │   └── player.py  # LinuxSoundPlayer (sounddevice output)
@@ -55,12 +64,13 @@ sound-player/
 │   └── audiolayer.py      # AudioLayer class with mixer
 ├── tests/                 # Unit tests
 │   ├── conftest.py        # Pytest fixtures
-│   ├── test_common.py     # Tests for common.py
-│   ├── test_sound.py      # Tests for sound.py
-│   ├── test_audiolayer.py # Tests for audiolayer.py
-│   ├── test_player.py     # Tests for player.py
+│   ├── test_common.py     # Tests for StatusMixin/VolumeMixin
+│   ├── test_sound.py      # Tests for BaseSound
+│   ├── test_audiolayer.py # Tests for AudioLayer
+│   ├── test_player.py     # Tests for BaseSoundPlayer
 │   ├── test_audio_config.py  # Tests for AudioConfig
 │   ├── test_mixer.py      # Tests for AudioMixer
+│   ├── test_fade_mixin.py # Tests for FadeMixin
 │   └── test_linux_pcm.py  # Tests for LinuxPCMSound
 ├── data/                  # Test audio files
 │   ├── music.ogg
@@ -117,47 +127,64 @@ The library uses a cooperative mixin-based inheritance pattern to provide reusab
 
 ```
 LockMixin
-    └── VolumeMixin (extends LockMixin)
-            └── StatusMixin (extends VolumeMixin)
+├── VolumeMixin (extends LockMixin)
+│   └── FadeMixin (extends VolumeMixin)
+└── StatusMixin (extends LockMixin)
 
-AudioConfigMixin (standalone, used with StatusMixin)
+AudioConfigMixin (standalone)
 ```
 
 #### Mixin Classes
 
-**LockMixin** (`core/mixins.py`)
+**LockMixin** (`core/mixins/lock.py`)
 - Provides `threading.RLock()` for thread-safe operations
 - Base mixin for all other mixins
 
-**VolumeMixin** (`core/mixins.py`)
+**VolumeMixin** (`core/mixins/volume.py`)
 - Extends `LockMixin`
 - Manages volume with `_volume` attribute
 - Provides `set_volume()` and `volume` property
 - Clamps values to 0.0-1.0 range
 - Thread-safe via inherited lock
 
-**StatusMixin** (`core/mixins.py`)
-- Extends `VolumeMixin` (inherits volume management and lock)
+**StatusMixin** (`core/mixins/status.py`)
+- Extends `LockMixin` (inherits lock for thread safety)
 - Manages playback status with `_status` attribute
 - Provides `play()`, `pause()`, `stop()` methods
 - Thread-safe status transitions
 - Hooks for subclasses: `_do_play()`, `_do_pause()`, `_do_stop()`
 - **Critical**: Status is set BEFORE calling hooks to avoid race conditions
 
-**AudioConfigMixin** (`core/mixins.py`)
+**FadeMixin** (`core/mixins/fade.py`)
+- Extends `VolumeMixin` (inherits volume management and lock)
+- Manages fade state with sample-accurate timing
+- Provides `fade_in(duration)`, `fade_out(duration)` convenience methods
+- Provides `start_fade_in(duration, target_volume)`, `start_fade_out(duration, target_volume)` for fine control
+- Configurable fade curves: `LINEAR`, `EXPONENTIAL`, `LOGARITHMIC`, `SCURVE` (default)
+- `_get_fade_multiplier_array(size)` generates per-sample fade multipliers for a chunk
+- Properties: `fade_state`, `fade_curve`, `is_fading`
+
+**AudioConfigMixin** (`core/mixins/audio_config.py`)
 - Manages `AudioConfig` object
 - Provides `config` property
-- Used in combination with `StatusMixin`
+- Used in combination with other mixins
 
 #### Mixin Usage Example
 
 ```python
-# AudioLayer inherits from both StatusMixin and AudioConfigMixin
-class AudioLayer(StatusMixin, AudioConfigMixin):
+# AudioLayer inherits from StatusMixin, VolumeMixin, and AudioConfigMixin
+class AudioLayer(StatusMixin, VolumeMixin, AudioConfigMixin):
     def __init__(self, ...):
         super().__init__(*args, **kwargs)  # Cooperative inheritance
-        # StatusMixin provides: _status, volume, play(), pause(), stop(), _lock
+        # StatusMixin provides: _status, play(), pause(), stop(), _lock
+        # VolumeMixin provides: _volume, set_volume(), volume property
         # AudioConfigMixin provides: config
+
+# BaseSound inherits from StatusMixin, AudioConfigMixin, and FadeMixin
+class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin):
+    # StatusMixin provides: _status, play(), pause(), stop(), _lock
+    # FadeMixin provides: _volume (via VolumeMixin), fade_in(), fade_out(), _get_fade_multiplier_array()
+    # AudioConfigMixin provides: config
 ```
 
 ### Key Classes
@@ -192,14 +219,17 @@ Mixes multiple audio streams using NumPy:
 
 Abstract base class with PCM buffer interface:
 
-**Inheritance:** `StatusMixin, AudioConfigMixin`
+**Inheritance:** `StatusMixin, AudioConfigMixin, FadeMixin`
 
 **Core Methods:**
 - `play()`, `pause()`, `stop()`, `wait()` - Inherited from `StatusMixin`
-- `set_loop(loop)`, `set_volume(volume)` - Volume from `StatusMixin`, loop is custom
+- `set_loop(loop)` - Custom loop management
+- `set_volume(volume)` - Volume from `VolumeMixin` (via `FadeMixin`)
+- `fade_in(duration)`, `fade_out(duration)` - Inherited from `FadeMixin`
+- `get_next_chunk(size)` - Returns faded audio chunk (handles fade math automatically)
 
 **PCM Interface (must be implemented by subclasses):**
-- `get_next_chunk(size)` - Return next audio chunk as numpy array
+- `_do_get_next_chunk(size)` - Return next raw audio chunk as numpy array
 - `get_sample_rate()` - Return sample rate
 - `get_channels()` - Return channel count
 - `seek(position)` - Seek to position in seconds
@@ -208,21 +238,26 @@ Abstract base class with PCM buffer interface:
 
 Manages a queue of sounds with mixing:
 
-**Inheritance:** `StatusMixin, AudioConfigMixin`
+**Inheritance:** `StatusMixin, VolumeMixin, AudioConfigMixin`
 
 **Properties:**
 - `concurrency` - Max concurrent sounds
 - `replace` - Stop old sounds when limit exceeded
 - `loop` - Default loop count for sounds
-- `volume` - Layer volume (0.0-1.0, inherited from `StatusMixin`)
+- `volume` - Layer volume (0.0-1.0, from `VolumeMixin`)
 - `mixer` - Internal AudioMixer instance
 
 **Methods:**
-- `enqueue(sound)` - Add sound to waiting queue
+- `enqueue(sound, fade_in=None, fade_out=None)` - Add sound to waiting queue, applies layer defaults for loop, fade curve, and fade durations
 - `play()`, `pause()`, `stop()` - Inherited from `StatusMixin`
 - `clear()` - Clear all queues
 - `set_concurrency(n)`, `set_replace(bool)`, `set_loop(n)`
+- `set_fade_in_duration(duration)`, `set_fade_out_duration(duration)`, `set_fade_curve(curve)` - Fade defaults for enqueued sounds
 - `get_next_chunk()` - Get mixed audio from current sounds
+
+**Crossfade Support:**
+- When `replace=True` and `fade_out_duration` is set, replaced sounds fade out instead of stopping immediately
+- Fading-out sounds are tracked in `_fading_out_sounds` and removed once the fade completes
 
 **Threading:**
 - Daemon thread manages sound lifecycle
@@ -233,35 +268,36 @@ Manages a queue of sounds with mixing:
 
 Abstract base class for platform-specific audio output:
 
-**Inheritance:** `StatusMixin, AudioConfigMixin`
+**Inheritance:** `StatusMixin, VolumeMixin, AudioConfigMixin, ABC`
 
 **Methods:**
-- `create_audio_layer(id, **kwargs)` - Create new audio layer
+- `create_audio_layer(id, force=False, **kwargs)` - Create new audio layer (use `force=True` to overwrite existing)
+- `delete_audio_layer(id)` - Delete an audio layer
 - `enqueue(sound, layer_id)` - Add sound to layer
 - `play(layer_id)`, `pause(layer_id)`, `stop(layer_id)` - Control playback
-- `set_volume(volume)`, `get_volume()` - Master volume (inherited from `StatusMixin`)
+- `set_volume(volume)` - Master volume (from `VolumeMixin`)
 - `get_next_chunk()` - Get mixed output from all layers
+- `get_audio_layers()` - Get all layer names
+- `clear(layer_id)` - Clear queues
 - `__getitem__(layer_id)` - Access layer by ID
 
 **Abstract Methods** (platform-specific):
 - `_create_output_stream()` - Create platform audio stream
-- `_write_audio(data)` - Write audio to output
 - `_close_output_stream()` - Close audio stream
-
-### Platform Implementations
 
 ### Platform Implementations
 
 #### LinuxPCMSound (`platform/linux/sound.py`)
 
-Linux implementation using:
+Linux/Windows implementation using:
 - **soundfile** for audio decoding (supports many formats)
-- Implements PCM buffer interface via `get_next_chunk()`
+- Implements PCM buffer interface via `_do_get_next_chunk()`
 - Supports sample rate conversion and channel conversion
+- Float-to-int conversion for float-format audio files (Vorbis, OPUS, MP3, FLAC)
 
 #### LinuxSoundPlayer (`platform/linux/player.py`)
 
-Linux audio output using:
+Linux/Windows audio output using:
 - **sounddevice** for audio output (blocking write mode)
 - Continuously pulls mixed audio and writes to device
 - Inherits from `BaseSoundPlayer`
@@ -285,8 +321,8 @@ Android audio output using AudioTrack (placeholder):
 - `numpy>=1.24` - Audio mixing
 - `soundfile~=0.12` - Audio file decoding
 
-**Optional (Linux):**
-- `sounddevice~=0.4` - Audio output (install with `pip install sound-player[linux]`)
+**Optional (Linux/Windows):**
+- `sounddevice~=0.4` - Audio output (install with `pip install sound-player[linux]` or `pip install sound-player[windows]`)
 
 **Android:**
 - `jnius`, `android` - Android platform APIs (already available on Android)
@@ -315,7 +351,7 @@ From `pyproject.toml`:
 
 ### Testing
 
-The project uses **pytest** for unit testing with 151 tests covering all core functionality.
+The project uses **pytest** for unit testing with 169 tests covering all core functionality.
 
 Run tests:
 ```bash
@@ -341,17 +377,20 @@ Platform detection uses the `krozark-current-platform` package:
 ```python
 from currentplatform import platform
 
-if platform == "linux":
-    from .linux_pcm import LinuxPCMSound as Sound
+if platform in ("linux", "windows"):
+    # Linux and Windows share the same sounddevice/soundfile-based implementation
+    from .linux import LinuxPCMSound as Sound
+    from .linux import LinuxSoundPlayer as SoundPlayer
 elif platform == "android":
-    from .android_pcm import AndroidPCMSound as Sound
+    from .android import AndroidPCMSound as Sound
+    from .android import AndroidSoundPlayer as SoundPlayer
 else:
-    raise NotImplementedError()
+    raise NotImplementedError(f"No implementation available for platform: {platform}")
 ```
 
 ## Important Patterns
 
-1. **PCM Buffer Interface**: All sounds implement `get_next_chunk(size)` which returns numpy arrays for mixing
+1. **PCM Buffer Interface**: All sounds implement `_do_get_next_chunk(size)` which returns numpy arrays for mixing. The public `get_next_chunk(size)` in `BaseSound` handles fade math and thread safety.
 2. **Mixin Cooperative Inheritance**: All mixins use `*args, **kwargs` to pass through to parent classes
 3. **Status-First Hook Pattern**: In `StatusMixin`, status is set BEFORE calling hooks to avoid race conditions
 4. **Threading**: `AudioLayer` uses a daemon thread that polls every 100ms
@@ -360,6 +399,7 @@ else:
 7. **Loop convention**: `-1` means infinite loop, positive numbers are finite loops
 8. **Volume hierarchy**: All volumes use 0.0-1.0 float range consistently
    - Sound volume × Layer volume × Master volume = Final output
+9. **Fade integration**: `BaseSound.get_next_chunk()` applies per-sample fade multipliers from `FadeMixin` after getting raw data from `_do_get_next_chunk()`. Auto-stops playback when a fade-out completes to volume 0.
 
 ## Common Tasks
 
@@ -370,13 +410,13 @@ else:
   - Add platform detection in `platform/__init__.py`
 - **Modify audio mixing behavior**: Edit `mixer.py`, specifically the `get_next_chunk()` method
 - **Add new sound features**: Extend `BaseSound` interface in `core/base_sound.py`, then implement in platform-specific classes
-- **Add new mixin**: Create mixin in `core/mixins.py` with cooperative inheritance pattern
+- **Add new mixin**: Create mixin in `core/mixins/` package with cooperative inheritance pattern
 
 ## Notes
 
 - The library is designed for games and applications that need multiple concurrent sounds with real-time mixing
 - Thread-safe operations are important due to the daemon thread in AudioLayer
 - Platform-specific code should be isolated to platform-specific modules
-- Audio output is integrated via `BaseSoundPlayer` subclasses (Linux uses sounddevice, Android uses AudioTrack)
+- Audio output is integrated via `BaseSoundPlayer` subclasses (Linux/Windows use sounddevice, Android uses AudioTrack)
 - All volume values consistently use 0.0-1.0 float range for predictable behavior
 - Status hooks (`_do_play`, `_do_pause`, `_do_stop`) are called WITH the lock held - keep them lightweight
