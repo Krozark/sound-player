@@ -5,6 +5,7 @@ the interface for platform-specific audio output implementations.
 """
 
 import logging
+import time
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -156,6 +157,23 @@ class BaseSoundPlayer(StatusMixin, VolumeMixin, AudioConfigMixin, ABC):
                 for audio_layer in self._audio_layers.values():
                     audio_layer.stop()
                 super().stop()
+
+    def wait(self, layer=None, timeout: float | None = None) -> None:
+        """Wait until all sounds have finished playing.
+
+        Args:
+            layer: Specific layer to wait for, or None to wait for all layers
+            timeout: Maximum time to wait in seconds, None for unlimited
+        """
+        logger.debug("BaseSoundPlayer.wait(%s)", layer)
+        start_time = time.time()
+        if layer is not None:
+            self._audio_layers[layer].wait(timeout=timeout)
+        else:
+            for audio_layer in self._audio_layers.values():
+                elapsed = time.time() - start_time
+                remaining = None if timeout is None else max(0.0, timeout - elapsed)
+                audio_layer.wait(timeout=remaining)
 
     def get_audio_layers(self):
         """Get all audio layer names.

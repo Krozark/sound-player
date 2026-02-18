@@ -207,6 +207,27 @@ class AudioLayer(StatusMixin, VolumeMixin, AudioConfigMixin):
         """Hook called when play status changes to STOPPED."""
         self.clear()
 
+    def wait(self, timeout: float | None = None) -> None:
+        """Wait until all sounds in this layer have finished playing.
+
+        Args:
+            timeout: Maximum time to wait in seconds, None for unlimited
+        """
+        logger.debug("AudioLayer.wait()")
+        start_time = time.time()
+        while True:
+            with self._lock:
+                done = (
+                    len(self._queue_waiting) == 0
+                    and len(self._queue_current) == 0
+                    and len(self._fading_out_sounds) == 0
+                )
+            if done:
+                return
+            if timeout is not None and time.time() - start_time >= timeout:
+                return
+            time.sleep(0.1)
+
     def get_next_chunk(self) -> np.ndarray:
         """Get the next mixed audio chunk from this layer.
 
