@@ -64,6 +64,14 @@ class AndroidPCMSound(BaseSound):
         self._file_sample_rate = 44100
         self._file_channels = 2
 
+        # Loop tracking
+        self._loop_count = 0
+
+        # Total output frames for one full pass (set from MediaFormat durationUs)
+        self._total_output_frames: int = 0
+        # Output frames consumed in the current pass
+        self._frames_consumed: int = 0
+
         # Decoding state
         self._decode_thread = None
         self._stop_decoding = threading.Event()
@@ -90,6 +98,8 @@ class AndroidPCMSound(BaseSound):
             self._pcm_buffer = None
             self._pcm_buffer_position = 0
         self._stop_decoding.clear()
+        self._loop_count = 0
+        self._frames_consumed = 0
 
     def _start_decoding(self, seek_to: float = 0.0):
         """Initialize extractor + codec and start the decode thread.
@@ -112,6 +122,9 @@ class AndroidPCMSound(BaseSound):
                         self._file_sample_rate = fmt.getInteger("sample-rate")
                     if fmt.containsKey("channel-count"):
                         self._file_channels = fmt.getInteger("channel-count")
+                    if fmt.containsKey("durationUs"):
+                        duration_us = fmt.getLong("durationUs")
+                        self._total_output_frames = int(duration_us * self.config.sample_rate / 1_000_000)
                     break
 
             if audio_track_index < 0:
@@ -133,6 +146,8 @@ class AndroidPCMSound(BaseSound):
             output_format.setInteger("pcm-encoding", encoding)
             self._codec.configure(output_format, None, None, 0)
             self._codec.start()
+
+            self._frames_consumed = 0
 
             self._decode_thread = threading.Thread(
                 target=self._decode_thread_task,
@@ -164,11 +179,7 @@ class AndroidPCMSound(BaseSound):
             while not self._stop_decoding.is_set() and not eof:
                 # Backpressure: pause when the PCM buffer is large enough.
                 with self._buffer_lock:
-                    buffered = (
-                        len(self._pcm_buffer) - self._pcm_buffer_position
-                        if self._pcm_buffer is not None
-                        else 0
-                    )
+                    buffered = len(self._pcm_buffer) - self._pcm_buffer_position if self._pcm_buffer is not None else 0
                 if buffered > max_buffered_samples:
                     time.sleep(0.05)
                     continue
@@ -292,7 +303,7 @@ class AndroidPCMSound(BaseSound):
                 samples_needed = size * config.channels
                 samples_to_return = min(samples_needed, available)
                 end_pos = self._pcm_buffer_position + samples_to_return
-                samples = self._pcm_buffer[self._pcm_buffer_position:end_pos]
+                samples = self._pcm_buffer[self._pcm_buffer_position : end_pos]
                 self._pcm_buffer_position += samples_to_return
 
                 if self._pcm_buffer_position >= len(self._pcm_buffer):
@@ -301,6 +312,7 @@ class AndroidPCMSound(BaseSound):
 
                 frames = len(samples) // config.channels
                 samples = samples[: frames * config.channels].reshape((frames, config.channels))
+                self._frames_consumed += frames
                 if frames < size:
                     padding = np.zeros((size - frames, config.channels), dtype=config.dtype)
                     samples = np.concatenate((samples, padding))
@@ -318,12 +330,26 @@ class AndroidPCMSound(BaseSound):
             self._status = STATUS.STOPPED
             return None
 
+    def _get_remaining_samples(self) -> int | None:
+        """Return remaining output samples until end of the last loop.
+
+        Returns None for infinite loops or when duration is unknown.
+        Called with the lock held.
+        """
+        if self._extractor is None or self._loop == -1 or self._total_output_frames == 0:
+            return None
+
+        # Check if we are on the last loop iteration
+        is_last_loop = self._loop is None or self._loop_count >= self._loop - 1
+        if not is_last_loop:
+            return None
+
+        remaining = self._total_output_frames - self._frames_consumed
+        return max(0, remaining)
+
     def _check_loop(self) -> bool:
         """Increment the loop counter and return True if playback should loop."""
-        if hasattr(self, "_loop_count"):
-            self._loop_count += 1
-        else:
-            self._loop_count = 1
+        self._loop_count += 1
         if self._loop == -1:
             return True
         return self._loop is not None and self._loop_count < self._loop

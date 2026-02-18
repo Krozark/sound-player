@@ -69,9 +69,7 @@ class LinuxPCMSound(BaseSound):
 
         # Cache whether conversion is needed (avoids recalculating every chunk)
         config = self.config
-        self._needs_conversion = (
-            self._file_sample_rate != config.sample_rate or self._file_channels != config.channels
-        )
+        self._needs_conversion = self._file_sample_rate != config.sample_rate or self._file_channels != config.channels
 
         # Cache whether float-to-int conversion is needed for _safe_read
         self._needs_float_conversion = self._file_is_float and config.dtype in (
@@ -319,6 +317,29 @@ class LinuxPCMSound(BaseSound):
                 [np.interp(indices, source_indices, data[:, ch]) for ch in range(data.shape[1])]
             ).astype(data.dtype)
             return resampled
+
+    def _get_remaining_samples(self) -> int | None:
+        """Return remaining output samples until end of the last loop.
+
+        Returns None for infinite loops or when the file is not open.
+        Called with the lock held.
+        """
+        if self._sound_file is None or self._loop == -1:
+            return None
+
+        # Check if we are on the last loop iteration
+        # _loop_count is incremented each time EOF is hit, so during pass N it equals N
+        is_last_loop = self._loop is None or self._loop_count >= self._loop - 1
+        if not is_last_loop:
+            return None
+
+        remaining_file_samples = self._file_info.frames - self._position
+        if remaining_file_samples <= 0:
+            return 0
+
+        if self._file_sample_rate != self.config.sample_rate:
+            return int(remaining_file_samples * self.config.sample_rate / self._file_sample_rate)
+        return remaining_file_samples
 
     def _check_loop(self) -> bool:
         """Check if we should loop and update loop counter.

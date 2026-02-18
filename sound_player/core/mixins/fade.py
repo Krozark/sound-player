@@ -50,6 +50,7 @@ class FadeMixin(VolumeMixin):
         self._fade_target_volume = 1.0
         self._samples_processed = 0
         self._total_fade_samples = 0
+        self._fade_out_samples: int | None = None
 
     def start_fade_in(self, duration: float, target_volume: float = 1.0) -> None:
         """Start a fade-in from 0 to target_volume over duration seconds.
@@ -177,6 +178,22 @@ class FadeMixin(VolumeMixin):
             True if currently fading
         """
         return self._fade_state != FadeState.NONE
+
+    def set_fade_out_duration(self, duration: float | None) -> None:
+        """Set the auto fade-out duration, caching the equivalent sample count.
+
+        When set, fade-out will be triggered automatically the given number of
+        seconds before the natural end of the sound (last loop).
+
+        Args:
+            duration: Fade-out duration in seconds (None to disable)
+        """
+        logger.debug(f"set_fade_out_duration({duration})")
+        with self._lock:
+            if duration is not None and duration > 0:
+                self._fade_out_samples = int(duration * self.config.sample_rate)
+            else:
+                self._fade_out_samples = None
 
     def fade_in(self, duration: float) -> None:
         """Start a fade-in from 0 to target_volume over duration seconds.

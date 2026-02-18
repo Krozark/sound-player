@@ -168,7 +168,7 @@ class AudioLayer(StatusMixin, VolumeMixin, AudioConfigMixin):
             if fade_out is None:
                 fade_out = self._fade_out_duration
             if fade_out is not None:
-                sound._fade_out_duration = fade_out
+                sound.set_fade_out_duration(fade_out)
 
             self._queue_waiting.append(sound)
 

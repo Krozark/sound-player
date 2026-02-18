@@ -56,6 +56,15 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin, ABC):
         while self._status != STATUS.STOPPED and (timeout is None or time.time() - start_time < timeout):
             time.sleep(0.1)
 
+    def _get_remaining_samples(self) -> int | None:
+        """Return the number of output samples remaining until end of the last loop.
+
+        Returns None if unknown (e.g. infinite loop, or platform doesn't support it).
+        Called with the lock held. Subclasses should override this to enable
+        automatic fade-out support.
+        """
+        return None
+
     def get_next_chunk(self, size: int) -> np.ndarray | None:
         """Return next audio chunk as numpy array.
 
@@ -64,6 +73,16 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin, ABC):
         with self._lock:
             if self._status in (STATUS.STOPPED, STATUS.PAUSED):
                 return None
+
+            # Auto-trigger fade-out when approaching end of last loop
+            if (
+                self._fade_out_samples is not None
+                and self._fade_state != FadeState.FADING_OUT
+                and self._fade_target_volume > 0.001
+            ):
+                remaining = self._get_remaining_samples()
+                if remaining is not None and 0 < remaining <= self._fade_out_samples:
+                    self.start_fade_out(remaining / self.config.sample_rate)
 
             chunk = self._do_get_next_chunk(size)
 

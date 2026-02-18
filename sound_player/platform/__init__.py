@@ -4,7 +4,6 @@ This module contains platform-specific audio implementations organized by submod
 """
 
 import logging
-import os
 
 from currentplatform import platform
 
@@ -21,16 +20,9 @@ if platform in ("linux", "windows"):
     from .linux import LinuxPCMSound as Sound
     from .linux import LinuxSoundPlayer as SoundPlayer
 elif platform == "android":
-    # Select the Android decoder via environment variable (default: sync).
-    #   SOUND_PLAYER_ANDROID_DECODER=sync   — background decode thread with backpressure
-    #   SOUND_PLAYER_ANDROID_DECODER=async  — MediaCodec callback mode, event-driven
-    _decoder = os.environ.get("SOUND_PLAYER_ANDROID_DECODER", "sync").lower()
-    if _decoder == "async":
-        from .android import AndroidPCMSoundAsync as Sound
-    else:
-        from .android import AndroidPCMSound as Sound
+    # Select the Android decoder via environment variable).
+    from .android import AndroidPCMSound as Sound
     from .android import AndroidSoundPlayer as SoundPlayer
-    logger.debug("Android decoder: %s", _decoder)
 else:
     logger.critical("No implementation found for platform %s", platform)
     raise NotImplementedError(f"No implementation available for platform: {platform}")
