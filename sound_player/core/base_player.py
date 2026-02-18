@@ -166,10 +166,10 @@ class BaseSoundPlayer(StatusMixin, VolumeMixin, AudioConfigMixin, ABC):
             timeout: Maximum time to wait in seconds, None for unlimited
         """
         logger.debug("BaseSoundPlayer.wait(%s)", layer)
-        start_time = time.time()
         if layer is not None:
             self._audio_layers[layer].wait(timeout=timeout)
         else:
+            start_time = time.time()
             for audio_layer in self._audio_layers.values():
                 elapsed = time.time() - start_time
                 remaining = None if timeout is None else max(0.0, timeout - elapsed)
