@@ -7,7 +7,7 @@ from collections import deque
 
 import numpy as np
 
-from .core.mixins import STATUS, AudioConfigMixin, FadeCurve, StatusMixin, VolumeMixin
+from .core.mixins import STATUS, AudioConfigMixin, FadeCurve, FadeState, StatusMixin, VolumeMixin
 from .mixer import AudioMixer
 
 logger = logging.getLogger(__name__)
@@ -55,6 +55,7 @@ class AudioLayer(StatusMixin, VolumeMixin, AudioConfigMixin):
             volume: Layer volume (0.0-1.0)
             config: AudioConfig for the mixer
         """
+        AudioLayer._check_replace_loop(replace, loop)
         super().__init__(*args, **kwargs)
         self._concurrency = concurrency
         self._replace_on_add = replace
@@ -75,6 +76,14 @@ class AudioLayer(StatusMixin, VolumeMixin, AudioConfigMixin):
         """Get the AudioMixer for this layer."""
         return self._mixer
 
+    @staticmethod
+    def _check_replace_loop(replace: bool, loop: int | None) -> None:
+        """Raise ValueError if replace=False and loop=-1 (infinite loop blocks all slots forever)."""
+        if not replace and loop == -1:
+            raise ValueError(
+                "replace=False with loop=-1 is invalid: sounds would loop forever and never free their slot."
+            )
+
     def set_concurrency(self, concurrency):
         """Set the maximum number of concurrent sounds.
 
@@ -92,6 +101,7 @@ class AudioLayer(StatusMixin, VolumeMixin, AudioConfigMixin):
             replace: If True, stop old sounds when adding new ones
         """
         logger.debug("AudioLayer.set_replace(%s)", replace)
+        AudioLayer._check_replace_loop(replace, self._loop)
         with self._lock:
             self._replace_on_add = replace
 
@@ -102,6 +112,7 @@ class AudioLayer(StatusMixin, VolumeMixin, AudioConfigMixin):
             loop: Number of times to loop (-1 for infinite)
         """
         logger.debug("AudioLayer.set_loop(%s)", loop)
+        AudioLayer._check_replace_loop(self._replace_on_add, loop)
         with self._lock:
             self._loop = loop
 
@@ -251,15 +262,21 @@ class AudioLayer(StatusMixin, VolumeMixin, AudioConfigMixin):
             while self._status != STATUS.STOPPED:
                 if self._status == STATUS.PLAYING:
                     with self._lock:
-                        # Remove stopped sounds from current queue
+                        # Remove stopped sounds; also move fading-out sounds to
+                        # _fading_out_sounds when sounds are waiting so the next
+                        # sound can start immediately (sequential crossfade).
                         i = 0
                         while i < len(self._queue_current):
-                            sound_status = self._queue_current[i].status()
-                            if sound_status == STATUS.STOPPED:
-                                sound = self._queue_current.pop(i)
+                            sound = self._queue_current[i]
+                            if sound.status() == STATUS.STOPPED:
+                                self._queue_current.pop(i)
                                 logger.debug("sound %s has stopped. Remove it", sound)
                                 self._mixer.remove_sound(sound)
                                 del sound
+                            elif sound.fade_state == FadeState.FADING_OUT:
+                                self._queue_current.pop(i)
+                                self._fading_out_sounds.append(sound)
+                                logger.debug("Sequential crossfade: sound %s is fading out, freeing slot", sound)
                             else:
                                 i += 1
 

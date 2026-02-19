@@ -3,6 +3,8 @@
 import time
 from collections import deque
 
+import pytest
+
 from sound_player.audiolayer import AudioLayer
 from sound_player.core.mixins import STATUS
 
@@ -51,6 +53,18 @@ class TestAudioLayerSetters:
     def test_set_loop(self):
         """Test set_loop method."""
         layer = AudioLayer()
+        layer.set_loop(3)
+        assert layer._loop == 3
+
+    def test_set_loop_infinite_requires_replace(self):
+        """Test that loop=-1 raises ValueError when replace=False."""
+        layer = AudioLayer(replace=False)
+        with pytest.raises(ValueError):
+            layer.set_loop(-1)
+
+    def test_set_loop_infinite_allowed_with_replace(self):
+        """Test that loop=-1 is allowed when replace=True."""
+        layer = AudioLayer(replace=True)
         layer.set_loop(-1)
         assert layer._loop == -1
 

@@ -407,19 +407,17 @@ def test_play_fade():
 
     player = SoundPlayer()
 
-    # Create an ambience layer with crossfade enabled
-    # When a new sound is enqueued, the old one fades out while the new one fades in
     layer = player.create_audio_layer(
         "ambience",
         concurrency=1,
-        replace=True,
+        replace=False,
         fade_in_duration=5.0,  # 4-second crossfade
         fade_out_duration=5.0,  # 4-second crossfade
         volume=1,
     )
 
-    night = Sound("data/night-ambience.wav")
-    layer.enqueue(night)
+    layer.enqueue(Sound("data/night-ambience.wav"))
+    layer.enqueue(Sound("data/music.ogg"))
     player.play()
     player.wait()
 
@@ -435,17 +433,17 @@ def main(verbosity: int = 0):
     print("SOUND PLAYER LIBRARY - EXAMPLES")
     print("=" * 50)
 
-    test_basic_sound()
-    test_change_layer_volume()
-    test_change_sound_volume()
-    test_audio_layer_concurrency()
-    test_audio_layer_replace_mode()
-    test_sound_player_multiple_layers()
-    test_volume_controls()
-    test_loop_functionality()
-    test_audio_configuration()
-    test_manual_fade()
-    test_crossfade()
+    # test_basic_sound()
+    # test_change_layer_volume()
+    # test_change_sound_volume()
+    # test_audio_layer_concurrency()
+    # test_audio_layer_replace_mode()
+    # test_sound_player_multiple_layers()
+    # test_volume_controls()
+    # test_loop_functionality()
+    # test_audio_configuration()
+    # test_manual_fade()
+    # test_crossfade()
     test_play_fade()
 
     print("\n" + "=" * 50)
