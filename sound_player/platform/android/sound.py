@@ -78,18 +78,18 @@ class AndroidPCMSound(BaseSound):
 
         logger.debug(f"AndroidPCMSound initialized: {self._filepath}")
 
-    def _do_play(self):
+    def _do_play(self, *args, **kwargs):
         """Start or resume playback."""
         logger.debug("AndroidPCMSound._do_play()")
         if self._extractor is None:
             self._start_decoding()
 
-    def _do_pause(self):
+    def _do_pause(self, *args, **kwargs):
         """Pause playback."""
         logger.debug("AndroidPCMSound._do_pause()")
         # Decoding continues in background; data simply won't be consumed.
 
-    def _do_stop(self):
+    def _do_stop(self, *args, **kwargs):
         """Stop playback and reset state."""
         logger.debug("AndroidPCMSound._do_stop()")
         self._stop_decoding.set()

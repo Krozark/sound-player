@@ -112,7 +112,7 @@ class LinuxPCMSound(BaseSound):
         else:
             return self._sound_file.read(frames, dtype=self.config.dtype)
 
-    def _do_play(self):
+    def _do_play(self, *args, **kwargs):
         """Start or resume playback."""
         logger.debug("LinuxPCMSound._do_play()")
 
@@ -139,12 +139,12 @@ class LinuxPCMSound(BaseSound):
             if self._file_is_float:
                 logger.debug(f"File is float format, will convert to {config.dtype}")
 
-    def _do_pause(self):
+    def _do_pause(self, *args, **kwargs):
         """Pause playback."""
         logger.debug("LinuxPCMSound._do_pause()")
         # Position is preserved, we just stop reading
 
-    def _do_stop(self):
+    def _do_stop(self, *args, **kwargs):
         """Stop playback and reset position."""
         logger.debug("LinuxPCMSound._do_stop()")
         if self._sound_file is not None:

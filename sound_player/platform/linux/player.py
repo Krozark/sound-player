@@ -49,10 +49,7 @@ class LinuxSoundPlayer(BaseSoundPlayer):
         """
 
         config = self.config
-        logger.debug(
-            f"Creating sounddevice stream: {config.sample_rate}Hz, "
-            f"{config.channels}ch, {config.dtype}"
-        )
+        logger.debug(f"Creating sounddevice stream: {config.sample_rate}Hz, {config.channels}ch, {config.dtype}")
 
         self._stream = sd.RawOutputStream(
             samplerate=config.sample_rate,
@@ -106,7 +103,7 @@ class LinuxSoundPlayer(BaseSoundPlayer):
                 self._stream = None
 
     # Hooks for StatusMixin
-    def _do_play(self):
+    def _do_play(self, *args, **kwargs):
         """Hook called when play status changes to PLAYING."""
         # Start the audio output stream
         if self._stream is None:
@@ -114,13 +111,13 @@ class LinuxSoundPlayer(BaseSoundPlayer):
         if not self._stream.active:
             self._stream.start()
 
-    def _do_pause(self):
+    def _do_pause(self, *args, **kwargs):
         """Hook called when play status changes to PAUSED."""
         # Stop the audio output stream
         if self._stream and self._stream.active:
             self._stream.stop()
 
-    def _do_stop(self):
+    def _do_stop(self, *args, **kwargs):
         """Hook called when play status changes to STOPPED."""
         # Close the audio output stream
         self._close_output_stream()

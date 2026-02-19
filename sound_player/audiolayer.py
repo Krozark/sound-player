@@ -187,7 +187,7 @@ class AudioLayer(StatusMixin, VolumeMixin, AudioConfigMixin):
             self._queue_waiting.clear()
             self._queue_current.clear()
 
-    def _do_play(self):
+    def _do_play(self, *args, **kwargs):
         """Hook called when play status changes to PLAYING."""
         if self._thread is None:
             logger.debug("Create audio layer Thread")
@@ -198,12 +198,12 @@ class AudioLayer(StatusMixin, VolumeMixin, AudioConfigMixin):
         for sound in self._queue_current:
             sound.play()
 
-    def _do_pause(self):
+    def _do_pause(self, *args, **kwargs):
         """Hook called when play status changes to PAUSED."""
         for sound in self._queue_current:
             sound.pause()
 
-    def _do_stop(self):
+    def _do_stop(self, *args, **kwargs):
         """Hook called when play status changes to STOPPED."""
         self.clear()
 

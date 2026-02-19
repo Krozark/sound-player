@@ -14,14 +14,14 @@ from sound_player.core import STATUS, AudioConfig
 from sound_player.core.base_player import BaseSoundPlayer
 
 from ._android_api import (
-    AudioAttributesBuilder,
-    AudioFormatBuilder,
-    AudioTrack,
     CHANNEL_MASK_BY_CHANNELS,
     CONTENT_TYPE_MUSIC,
     ENCODING_BY_DTYPE,
     MODE_STREAM,
     USAGE_MEDIA,
+    AudioAttributesBuilder,
+    AudioFormatBuilder,
+    AudioTrack,
 )
 
 logger = logging.getLogger(__name__)
@@ -62,9 +62,7 @@ class AndroidSoundPlayer(BaseSoundPlayer):
 
         try:
             config = self.config
-            logger.debug(
-                f"Creating AudioTrack: {config.sample_rate}Hz, {config.channels}ch, {config.dtype}"
-            )
+            logger.debug(f"Creating AudioTrack: {config.sample_rate}Hz, {config.channels}ch, {config.dtype}")
 
             # Determine channel mask from config
             channel_mask = CHANNEL_MASK_BY_CHANNELS.get(config.channels)
@@ -177,7 +175,7 @@ class AndroidSoundPlayer(BaseSoundPlayer):
                 self._audiotrack = None
 
     # Hooks for StatusMixin
-    def _do_play(self):
+    def _do_play(self, *args, **kwargs):
         """Hook called when play status changes to PLAYING."""
         if self._audiotrack is None:
             self._create_output_stream()
@@ -186,12 +184,12 @@ class AndroidSoundPlayer(BaseSoundPlayer):
             self._audiotrack.play()
             self._start_output_thread()
 
-    def _do_pause(self):
+    def _do_pause(self, *args, **kwargs):
         """Hook called when play status changes to PAUSED."""
         if self._audiotrack:
             self._audiotrack.pause()
 
-    def _do_stop(self):
+    def _do_stop(self, *args, **kwargs):
         """Hook called when play status changes to STOPPED."""
         self._join_output_thread()
         self._close_output_stream()

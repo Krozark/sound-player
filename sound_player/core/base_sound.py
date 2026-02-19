@@ -82,7 +82,7 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin, ABC):
             ):
                 remaining = self._get_remaining_samples()
                 if remaining is not None and 0 < remaining <= self._fade_out_samples:
-                    self.start_fade_out(remaining / self.config.sample_rate)
+                    self.fade_out(remaining / self.config.sample_rate)
 
             chunk = self._do_get_next_chunk(size)
 

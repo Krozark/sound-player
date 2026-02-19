@@ -63,7 +63,7 @@ class StatusMixin(LockMixin, ABC):
                 return
             elif self._status != STATUS.PLAYING:
                 raise ValueError()
-            self._do_pause()
+            self._do_pause(*args, **kwargs)
             self._status = STATUS.PAUSED
 
     def stop(self, *args, **kwargs):
@@ -77,7 +77,7 @@ class StatusMixin(LockMixin, ABC):
                 return
             elif self._status not in (STATUS.PLAYING, STATUS.PAUSED):
                 raise ValueError()
-            self._do_stop()
+            self._do_stop(*args, **kwargs)
             self._status = STATUS.STOPPED
 
     # Hooks for subclasses to override

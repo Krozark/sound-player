@@ -34,13 +34,13 @@ class MockSound(BaseSound):
         self.do_pause_called = False
         self.do_stop_called = False
 
-    def _do_play(self):
+    def _do_play(self, *args, **kwargs):
         self.do_play_called = True
 
-    def _do_pause(self):
+    def _do_pause(self, *args, **kwargs):
         self.do_pause_called = True
 
-    def _do_stop(self):
+    def _do_stop(self, *args, **kwargs):
         self.do_stop_called = True
 
     def _do_seek(self, position=0):
@@ -63,26 +63,26 @@ class MockSound(BaseSound):
 class ConcreteStatusMixin(StatusMixin):
     """Concrete implementation of StatusMixin for testing."""
 
-    def _do_play(self):
+    def _do_play(self, *args, **kwargs):
         pass
 
-    def _do_pause(self):
+    def _do_pause(self, *args, **kwargs):
         pass
 
-    def _do_stop(self):
+    def _do_stop(self, *args, **kwargs):
         pass
 
 
 class ConcreteFadeMixin(StatusMixin, AudioConfigMixin, FadeMixin):
     """Concrete implementation of FadeMixin for testing."""
 
-    def _do_play(self):
+    def _do_play(self, *args, **kwargs):
         pass
 
-    def _do_pause(self):
+    def _do_pause(self, *args, **kwargs):
         pass
 
-    def _do_stop(self):
+    def _do_stop(self, *args, **kwargs):
         pass
 
 
