@@ -18,12 +18,9 @@ from sound_player.core.base_sound import BaseSound
 from sound_player.core.mixins import STATUS
 
 from ._android_api import (
-    ENCODING_BY_DTYPE,
-    ENCODING_PCM_16BIT,
     MediaCodec,
     MediaCodecBufferInfo,
     MediaExtractor,
-    MediaFormat,
 )
 
 logger = logging.getLogger(__name__)
@@ -67,7 +64,7 @@ class AndroidPCMSound(BaseSound):
         # Loop tracking
         self._loop_count = 0
 
-        # Total output frames for one full pass (set from MediaFormat durationUs)
+        # Total output frames for one full pass (set from durationUs in track format)
         self._total_output_frames: int = 0
         # Output frames consumed in the current pass
         self._frames_consumed: int = 0
@@ -140,11 +137,9 @@ class AndroidPCMSound(BaseSound):
 
             self._codec = MediaCodec.createDecoderByType(mime)
 
-            config = self.config
-            output_format = MediaFormat.createAudioFormat("audio/raw", config.sample_rate, config.channels)
-            encoding = ENCODING_BY_DTYPE.get(config.dtype, ENCODING_PCM_16BIT)
-            output_format.setInteger("pcm-encoding", encoding)
-            self._codec.configure(output_format, None, None, 0)
+            # Configure with the input (compressed) format from the extractor.
+            # The codec determines its own output format after decoding.
+            self._codec.configure(input_format, None, None, 0)
             self._codec.start()
 
             self._frames_consumed = 0
@@ -158,7 +153,7 @@ class AndroidPCMSound(BaseSound):
 
             logger.debug(
                 f"Sync decoder started: file={self._file_sample_rate}Hz/{self._file_channels}ch, "
-                f"output={config.sample_rate}Hz/{config.channels}ch"
+                f"output={self.config.sample_rate}Hz/{self.config.channels}ch"
             )
 
         except Exception as e:
