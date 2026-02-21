@@ -184,47 +184,66 @@ class AndroidPCMSound(BaseSound):
                     time.sleep(0.05)
                     continue
 
-                # --- Feed input ---
-                input_buffer_id = self._codec.dequeueInputBuffer(10_000)  # 10 ms
-                if input_buffer_id < 0:
-                    time.sleep(0.001)
-                    continue
+                # Grab local references; _do_stop() may set these to None.
+                codec = self._codec
+                extractor = self._extractor
+                if codec is None or extractor is None:
+                    break
 
-                input_buffer = self._codec.getInputBuffer(input_buffer_id)
-                input_buffer.clear()
-                size = self._extractor.readSampleData(input_buffer, 0)
+                try:
+                    # --- Feed input ---
+                    input_buffer_id = codec.dequeueInputBuffer(10_000)  # 10 ms
+                    if input_buffer_id < 0:
+                        time.sleep(0.001)
+                        continue
 
-                if size < 0:
-                    self._codec.queueInputBuffer(input_buffer_id, 0, 0, 0, _BUFFER_FLAG_END_OF_STREAM)
-                    eof = True
-                else:
-                    self._codec.queueInputBuffer(input_buffer_id, 0, size, 0, 0)
-                    self._extractor.advance()
+                    input_buffer = codec.getInputBuffer(input_buffer_id)
+                    input_buffer.clear()
+                    size = extractor.readSampleData(input_buffer, 0)
 
-                # --- Collect output ---
-                buffer_info = MediaCodecBufferInfo()
-                output_buffer_id = self._codec.dequeueOutputBuffer(buffer_info, 10_000)
+                    if size < 0:
+                        codec.queueInputBuffer(input_buffer_id, 0, 0, 0, _BUFFER_FLAG_END_OF_STREAM)
+                        eof = True
+                    else:
+                        codec.queueInputBuffer(input_buffer_id, 0, size, 0, 0)
+                        extractor.advance()
 
-                if output_buffer_id >= 0:
-                    self._on_decoded_data(output_buffer_id, buffer_info)
-                elif output_buffer_id == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
-                    logger.debug(f"Output format changed: {self._codec.getOutputFormat()}")
-                # INFO_TRY_AGAIN_LATER: just loop
+                    # --- Collect output ---
+                    if self._stop_decoding.is_set():
+                        break
+
+                    buffer_info = MediaCodecBufferInfo()
+                    output_buffer_id = codec.dequeueOutputBuffer(buffer_info, 10_000)
+
+                    if output_buffer_id >= 0:
+                        self._on_decoded_data(codec, output_buffer_id, buffer_info)
+                    elif output_buffer_id == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
+                        logger.debug(f"Output format changed: {codec.getOutputFormat()}")
+                    # INFO_TRY_AGAIN_LATER: just loop
+
+                except Exception as e:
+                    if self._stop_decoding.is_set():
+                        # Expected: codec was released during stop
+                        logger.debug("Decode thread: codec released during stop")
+                    else:
+                        logger.error(f"Decode thread codec error: {e}")
+                    break
 
         except Exception as e:
             logger.error(f"Decode thread error: {e}")
         finally:
             logger.debug("Decode thread ended")
 
-    def _on_decoded_data(self, buffer_id, buffer_info):
+    def _on_decoded_data(self, codec, buffer_id, buffer_info):
         """Append a decoded PCM buffer to the internal numpy buffer.
 
         Args:
+            codec: MediaCodec instance (local reference to avoid race with _do_stop).
             buffer_id: Output buffer index from MediaCodec.
             buffer_info: BufferInfo containing the valid byte count.
         """
         try:
-            output_buffer = self._codec.getOutputBuffer(buffer_id)
+            output_buffer = codec.getOutputBuffer(buffer_id)
             data = output_buffer.array()
             size = buffer_info.size
 
@@ -246,7 +265,7 @@ class AndroidPCMSound(BaseSound):
                     else:
                         self._pcm_buffer = np.concatenate((self._pcm_buffer, chunk))
 
-            self._codec.releaseOutputBuffer(buffer_id, False)
+            codec.releaseOutputBuffer(buffer_id, False)
 
         except Exception as e:
             logger.error(f"Error handling decoded data: {e}")
