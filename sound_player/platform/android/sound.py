@@ -8,6 +8,7 @@ audio decoding on Android using:
 - Proper format conversion (sample rate, channels)
 """
 
+import contextlib
 import logging
 import threading
 import time
@@ -162,16 +163,23 @@ class AndroidPCMSound(BaseSound):
             raise
 
     def _decode_thread_task(self):
-        """Background thread: feeds compressed data into the codec and collects PCM output."""
+        """Background thread: feeds compressed data into the codec and collects PCM output.
+
+        Uses the standard MediaCodec synchronous decoding pattern:
+        1. Feed input until EOS is signaled
+        2. Always collect output (even when no input buffer is available)
+        3. Drain remaining output after input EOS until output EOS is received
+        """
         logger.debug("Decode thread started")
 
         config = self.config
         max_buffered_samples = int(_MAX_BUFFER_SECONDS * config.sample_rate * config.channels)
 
         try:
-            eof = False
+            input_eos = False
+            output_eos = False
 
-            while not self._stop_decoding.is_set() and not eof:
+            while not self._stop_decoding.is_set() and not output_eos:
                 # Backpressure: pause when the PCM buffer is large enough.
                 with self._buffer_lock:
                     buffered = len(self._pcm_buffer) - self._pcm_buffer_position if self._pcm_buffer is not None else 0
@@ -186,24 +194,23 @@ class AndroidPCMSound(BaseSound):
                     break
 
                 try:
-                    # --- Feed input ---
-                    input_buffer_id = codec.dequeueInputBuffer(10_000)  # 10 ms
-                    if input_buffer_id < 0:
-                        time.sleep(0.001)
-                        continue
+                    # --- Feed input (skip if we already sent EOS) ---
+                    if not input_eos:
+                        input_buffer_id = codec.dequeueInputBuffer(10_000)  # 10 ms
+                        if input_buffer_id >= 0:
+                            input_buffer = codec.getInputBuffer(input_buffer_id)
+                            input_buffer.clear()
+                            size = extractor.readSampleData(input_buffer, 0)
 
-                    input_buffer = codec.getInputBuffer(input_buffer_id)
-                    input_buffer.clear()
-                    size = extractor.readSampleData(input_buffer, 0)
+                            if size < 0:
+                                codec.queueInputBuffer(input_buffer_id, 0, 0, 0, _BUFFER_FLAG_END_OF_STREAM)
+                                input_eos = True
+                                logger.debug("Input EOS signaled")
+                            else:
+                                codec.queueInputBuffer(input_buffer_id, 0, size, 0, 0)
+                                extractor.advance()
 
-                    if size < 0:
-                        codec.queueInputBuffer(input_buffer_id, 0, 0, 0, _BUFFER_FLAG_END_OF_STREAM)
-                        eof = True
-                    else:
-                        codec.queueInputBuffer(input_buffer_id, 0, size, 0, 0)
-                        extractor.advance()
-
-                    # --- Collect output ---
+                    # --- Collect output (always, to avoid deadlock) ---
                     if self._stop_decoding.is_set():
                         break
 
@@ -212,13 +219,15 @@ class AndroidPCMSound(BaseSound):
 
                     if output_buffer_id >= 0:
                         self._on_decoded_data(codec, output_buffer_id, buffer_info)
+                        if buffer_info.flags & _BUFFER_FLAG_END_OF_STREAM:
+                            output_eos = True
+                            logger.debug("Output EOS received")
                     elif output_buffer_id == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
                         logger.debug(f"Output format changed: {codec.getOutputFormat()}")
                     # INFO_TRY_AGAIN_LATER: just loop
 
                 except Exception as e:
                     if self._stop_decoding.is_set():
-                        # Expected: codec was released during stop
                         logger.debug("Decode thread: codec released during stop")
                     else:
                         logger.error(f"Decode thread codec error: {e}")
@@ -259,11 +268,11 @@ class AndroidPCMSound(BaseSound):
                         self._pcm_buffer = chunk
                     else:
                         self._pcm_buffer = np.concatenate((self._pcm_buffer, chunk))
-
-            codec.releaseOutputBuffer(buffer_id, False)
-
         except Exception as e:
             logger.error(f"Error handling decoded data: {e}")
+        finally:
+            with contextlib.suppress(Exception):
+                codec.releaseOutputBuffer(buffer_id, False)
 
     def _resample(self, data: np.ndarray) -> np.ndarray:
         """Resample audio data to the target sample rate (linear interpolation)."""
@@ -275,8 +284,6 @@ class AndroidPCMSound(BaseSound):
 
     def _release_decoder(self):
         """Stop and release all decoder resources."""
-        import contextlib
-
         if self._decode_thread and self._decode_thread.is_alive():
             self._decode_thread.join(timeout=1.0)
         self._decode_thread = None
