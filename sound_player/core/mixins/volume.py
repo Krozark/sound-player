@@ -20,7 +20,7 @@ class VolumeMixin(LockMixin):
         super().__init__(*args, **kwargs)
         self._volume = max(0.0, min(1.0, volume))
 
-    def set_volume(self, volume: float | None) -> None:
+    def set_volume(self, volume: float) -> None:
         """Set the volume with clamping.
 
         Args:

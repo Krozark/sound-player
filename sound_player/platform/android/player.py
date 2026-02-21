@@ -10,7 +10,7 @@ import time
 
 import numpy as np
 
-from sound_player.core import STATUS, AudioConfig
+from sound_player.core import STATUS
 from sound_player.core.base_player import BaseSoundPlayer
 
 from ._android_api import (
@@ -40,13 +40,13 @@ class AndroidSoundPlayer(BaseSoundPlayer):
     - Supports play/pause/stop control via inherited StatusMixin
     """
 
-    def __init__(self, config: AudioConfig | None = None):
+    def __init__(self, *args, **kwargs):
         """Initialize the AndroidSoundPlayer.
 
         Args:
             config: AudioConfig for audio output format
         """
-        super().__init__(config)
+        super().__init__(*args, **kwargs)
         self._audiotrack = None
         self._output_thread = None
         self._stop_output_event = threading.Event()
