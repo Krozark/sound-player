@@ -202,6 +202,70 @@ def find_nearest_zero_crossing_fast(position: int, zero_crossings: np.ndarray, s
     return int(nearby[np.argmin(distances)])
 
 
+def detect_silence_boundaries(
+    audio: np.ndarray,
+    sample_rate: int,
+    threshold_db: float = -40.0,
+    min_silence_duration: float = 0.05,
+) -> tuple[int, int]:
+    """Detect leading and trailing silence in audio data.
+
+    Args:
+        audio: Audio data as numpy array (samples,) or (samples, channels)
+        sample_rate: Sample rate in Hz
+        threshold_db: Amplitude threshold in dB below which audio is considered silence
+        min_silence_duration: Minimum duration in seconds for a region to count as silence
+
+    Returns:
+        Tuple of (first_sound_sample, last_sound_sample) — the range of non-silent audio.
+        Returns (0, len(audio)) if no silence is detected.
+    """
+    # Convert to mono for analysis
+    if audio.ndim > 1:
+        mono = np.mean(audio, axis=1)
+    else:
+        mono = audio.astype(np.float64)
+
+    # Convert dB threshold to linear amplitude
+    threshold_linear = 10.0 ** (threshold_db / 20.0)
+
+    # Compute amplitude envelope using a short sliding window
+    # to avoid triggering on individual zero-crossings
+    window_samples = max(1, int(min_silence_duration * sample_rate))
+    abs_mono = np.abs(mono)
+
+    # Find samples above threshold
+    above_threshold = abs_mono > threshold_linear
+
+    if not above_threshold.any():
+        # Entire file is silence
+        logger.warning("Entire file appears to be silence")
+        return 0, len(audio)
+
+    # Use a rolling window to require sustained signal, not just a single spike
+    if window_samples > 1 and len(above_threshold) > window_samples:
+        # Cumulative sum trick for rolling window
+        cumsum = np.concatenate([[0], np.cumsum(above_threshold)])
+        rolling_count = cumsum[window_samples:] - cumsum[:-window_samples]
+        # Consider a region as "sound" if at least 50% of the window is above threshold
+        sound_mask = rolling_count >= (window_samples * 0.5)
+
+        if not sound_mask.any():
+            return 0, len(audio)
+
+        first_sound = int(np.argmax(sound_mask))
+        last_sound = int(len(sound_mask) - 1 - np.argmax(sound_mask[::-1])) + window_samples
+    else:
+        first_sound = int(np.argmax(above_threshold))
+        last_sound = int(len(above_threshold) - 1 - np.argmax(above_threshold[::-1]))
+
+    # Clamp to valid range
+    first_sound = max(0, first_sound)
+    last_sound = min(len(audio), last_sound)
+
+    return first_sound, last_sound
+
+
 def find_optimal_loop_points(
     audio: np.ndarray,
     sample_rate: int,
@@ -449,6 +513,8 @@ def process_audio_for_loop(
     end_time: float | None = None,
     min_loop_duration: float | None = None,
     max_loop_duration: float | None = None,
+    trim_silence: bool = True,
+    silence_threshold_db: float = -40.0,
 ) -> dict:
     """Process an audio file to create a seamless loop.
 
@@ -462,6 +528,8 @@ def process_audio_for_loop(
         end_time: Manual end time in seconds (overrides auto_find)
         min_loop_duration: Minimum loop duration for auto-find (None = 50% of file)
         max_loop_duration: Maximum loop duration for auto-find
+        trim_silence: Remove leading/trailing silence for seamless looping
+        silence_threshold_db: Amplitude threshold in dB for silence detection
 
     Returns:
         Dictionary with processing information
@@ -483,6 +551,24 @@ def process_audio_for_loop(
 
     total_duration = len(audio) / sample_rate
     logger.info(f"Input: {total_duration:.2f}s, {sample_rate}Hz, {audio.shape[1]} channel(s)")
+
+    # Trim leading/trailing silence so loops don't have dead air gaps
+    trimmed_start_time = 0.0
+    trimmed_end_time = 0.0
+    if trim_silence:
+        first_sound, last_sound = detect_silence_boundaries(audio, sample_rate, threshold_db=silence_threshold_db)
+        trimmed_start_time = first_sound / sample_rate
+        trimmed_end_time = (len(audio) - last_sound) / sample_rate
+
+        if first_sound > 0 or last_sound < len(audio):
+            logger.info(
+                f"Trimming silence: removed {trimmed_start_time:.3f}s from start, "
+                f"{trimmed_end_time:.3f}s from end"
+            )
+            audio = audio[first_sound:last_sound]
+            audio_int = (audio * 32767).astype(np.int16)
+            total_duration = len(audio) / sample_rate
+            logger.info(f"After trimming: {total_duration:.2f}s")
 
     # Smart default for min_loop_duration: use 50% of file length so
     # auto-find doesn't produce unexpectedly short output files.
@@ -554,6 +640,8 @@ def process_audio_for_loop(
         "crossfade_duration": crossfade_duration,
         "curve_type": curve_type,
         "quality": loop_points.quality,
+        "trimmed_start": trimmed_start_time,
+        "trimmed_end": trimmed_end_time,
     }
 
 
@@ -631,6 +719,19 @@ Examples:
     )
 
     parser.add_argument(
+        "--no-trim-silence",
+        action="store_true",
+        help="Disable automatic removal of leading/trailing silence",
+    )
+
+    parser.add_argument(
+        "--silence-threshold",
+        type=float,
+        default=-40.0,
+        help="Silence detection threshold in dB (default: -40.0)",
+    )
+
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -661,6 +762,8 @@ Examples:
             end_time=args.end,
             min_loop_duration=args.min_loop,
             max_loop_duration=args.max_loop,
+            trim_silence=not args.no_trim_silence,
+            silence_threshold_db=args.silence_threshold,
         )
 
         print("\n=== Loop Creation Complete ===")
@@ -668,6 +771,8 @@ Examples:
         print(f"Output: {result['output_file']} ({result['output_duration']:.2f}s)")
         print(f"Format: {result['sample_rate']}Hz, {result['channels']} channel(s)")
         print(f"Crossfade: {result['crossfade_duration']}s ({result['curve_type']})")
+        if result["trimmed_start"] > 0 or result["trimmed_end"] > 0:
+            print(f"Silence trimmed: {result['trimmed_start']:.3f}s (start), {result['trimmed_end']:.3f}s (end)")
         if result["loop_start"] > 0 or result["loop_end"] < result["input_duration"]:
             print(f"Loop region: {result['loop_start']:.3f}s - {result['loop_end']:.3f}s")
         print(f"Quality score: {result['quality']:.2f}")
