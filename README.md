@@ -330,31 +330,6 @@ The `[android]` extra pulls in `pyjnius` and `android`; `numpy` and
 `soundfile` and `sounddevice` are **not** needed — the library uses
 `MediaExtractor` / `MediaCodec` / `AudioTrack` directly via `pyjnius`.
 
-### Choosing the Android decoder
-
-Two decoder implementations are available.  Select one at **runtime** by
-setting the `SOUND_PLAYER_ANDROID_DECODER` environment variable **before the
-first import** of `sound_player`:
-
-```python
-import os
-os.environ["SOUND_PLAYER_ANDROID_DECODER"] = "sync"   # default
-# or
-os.environ["SOUND_PLAYER_ANDROID_DECODER"] = "async"
-
-import sound_player
-```
-
-| Value | Class | How it works |
-|-------|-------|--------------|
-| `sync` *(default)* | `AndroidPCMSound` | Background Python thread polls `dequeueInputBuffer` / `dequeueOutputBuffer`. Backpressure pauses the thread when the PCM buffer holds > 2 s of audio. Simple and easy to debug. |
-| `async` | `AndroidPCMSoundAsync` | Registers a `MediaCodec.Callback`; Android's internal thread calls into Python when buffers are ready. Event-driven, no polling. |
-
-**Recommendation:** use `sync` (the default) for most cases, especially when
-playing many sounds concurrently (~10+).  The `async` mode is provided for
-experimentation; its backpressure currently blocks MediaCodec's internal
-thread, which is an anti-pattern at scale.
-
 ## Dependencies
 
 **Required:**
