@@ -18,6 +18,7 @@ from sound_player.core.base_sound import BaseSound
 from sound_player.core.mixins import STATUS
 
 from ._android_api import (
+    JavaByteBuffer,
     MediaCodec,
     MediaCodecBufferInfo,
     MediaExtractor,
@@ -239,12 +240,19 @@ class AndroidPCMSound(BaseSound):
         """
         try:
             output_buffer = codec.getOutputBuffer(buffer_id)
-            data = output_buffer.array()
             size = buffer_info.size
 
             if size > 0:
+                # MediaCodec returns direct ByteBuffers; .array() is unsupported.
+                # Copy into a heap-backed buffer to access the backing array.
+                output_buffer.position(buffer_info.offset)
+                output_buffer.limit(buffer_info.offset + size)
+                heap_buf = JavaByteBuffer.allocate(size)
+                heap_buf.put(output_buffer)
+                heap_buf.flip()
+                data = heap_buf.array()
                 config = self.config
-                chunk = np.frombuffer(data[:size], dtype=config.dtype)
+                chunk = np.frombuffer(bytes(data), dtype=config.dtype)
 
                 if self._file_channels == 1 and config.channels == 2:
                     chunk = np.column_stack((chunk, chunk)).flatten()
