@@ -10,10 +10,8 @@ The SoundPlayer (AudioTrack output) is shared by both.
 
 from .player import AndroidSoundPlayer
 from .sound import AndroidPCMSound
-from .sound_async import AndroidPCMSoundAsync
 
 __all__ = [
     "AndroidPCMSound",
-    "AndroidPCMSoundAsync",
     "AndroidSoundPlayer",
 ]

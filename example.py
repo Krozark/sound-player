@@ -261,10 +261,10 @@ def test_loop_functionality():
     layer = player.create_audio_layer("test", concurrency=1)
 
     sound = Sound("data/coin.wav")
-    sound.set_loop(3)  # Play 3 times
     layer.enqueue(sound)
 
     print("Playing sound 3 times...")
+    sound.set_loop(0)  # Play 3 times
     player.play()
     time.sleep(2)  # Wait for sound to play
     player.stop()
@@ -440,11 +440,11 @@ def main(verbosity: int = 0):
     # test_audio_layer_replace_mode()
     # test_sound_player_multiple_layers()
     # test_volume_controls()
-    # test_loop_functionality()
+    test_loop_functionality()
     # test_audio_configuration()
     # test_manual_fade()
     # test_crossfade()
-    test_play_fade()
+    # test_play_fade()
 
     print("\n" + "=" * 50)
     print("All examples completed!")
