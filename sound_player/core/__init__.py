@@ -4,7 +4,7 @@ This module contains the base classes and enums used throughout the library.
 """
 
 from .audio_config import AudioConfig
-from .constants import MAX_INT8, MAX_INT16, MAX_INT24, MAX_INT32, MIN_INT8, MIN_INT16, MIN_INT24, MIN_INT32
+from .constants import MAX_INT16, MAX_INT32, MIN_INT16, MIN_INT32
 from .mixins import (
     STATUS,
     AudioConfigMixin,
@@ -28,12 +28,8 @@ __all__ = [
     "FadeMixin",
     "get_global_audio_config",
     "set_global_audio_config",
-    "MAX_INT8",
     "MAX_INT16",
-    "MAX_INT24",
     "MAX_INT32",
-    "MIN_INT8",
     "MIN_INT16",
-    "MIN_INT24",
     "MIN_INT32",
 ]

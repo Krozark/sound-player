@@ -14,14 +14,13 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 try:
-    from jnius import PythonJavaClass, autoclass, java_method
+    from jnius import autoclass
 
     # NIO buffer (for reading direct ByteBuffers from MediaCodec)
     JavaByteBuffer = autoclass("java.nio.ByteBuffer")
 
     # Media decoding classes
     MediaExtractor = autoclass("android.media.MediaExtractor")
-    MediaFormat = autoclass("android.media.MediaFormat")
     MediaCodec = autoclass("android.media.MediaCodec")
     MediaCodecBufferInfo = autoclass("android.media.MediaCodec$BufferInfo")
 
@@ -64,14 +63,10 @@ CHANNEL_MASK_BY_CHANNELS = {
 }
 
 __all__ = [
-    # jnius helpers needed by DecodeCallback
-    "PythonJavaClass",
-    "java_method",
     # NIO
     "JavaByteBuffer",
     # Media decoding
     "MediaExtractor",
-    "MediaFormat",
     "MediaCodec",
     "MediaCodecBufferInfo",
     # Audio output
