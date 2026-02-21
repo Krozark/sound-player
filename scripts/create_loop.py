@@ -297,10 +297,13 @@ def find_optimal_loop_points(
             # Combined score (weighted average)
             combined_score = 0.6 * waveform_score + 0.4 * spectral_score
 
-            # Prefer longer loops slightly (normalization factor)
+            # Prefer longer loops to avoid unnecessarily short output files.
+            # Use an additive blend so that length preference works correctly
+            # even when similarity scores are similar (e.g. ambient sounds).
             loop_length = end - start
-            length_factor = 1.0 + 0.1 * (loop_length / max_samples)
-            combined_score *= length_factor
+            length_ratio = loop_length / max_samples
+            similarity_score = combined_score
+            combined_score = 0.7 * similarity_score + 0.3 * length_ratio
 
             if combined_score > best_score:
                 best_score = combined_score
@@ -444,7 +447,7 @@ def process_audio_for_loop(
     auto_find: bool = False,
     start_time: float | None = None,
     end_time: float | None = None,
-    min_loop_duration: float = 1.0,
+    min_loop_duration: float | None = None,
     max_loop_duration: float | None = None,
 ) -> dict:
     """Process an audio file to create a seamless loop.
@@ -457,7 +460,7 @@ def process_audio_for_loop(
         auto_find: Automatically find optimal loop points
         start_time: Manual start time in seconds (overrides auto_find)
         end_time: Manual end time in seconds (overrides auto_find)
-        min_loop_duration: Minimum loop duration for auto-find
+        min_loop_duration: Minimum loop duration for auto-find (None = 50% of file)
         max_loop_duration: Maximum loop duration for auto-find
 
     Returns:
@@ -480,6 +483,12 @@ def process_audio_for_loop(
 
     total_duration = len(audio) / sample_rate
     logger.info(f"Input: {total_duration:.2f}s, {sample_rate}Hz, {audio.shape[1]} channel(s)")
+
+    # Smart default for min_loop_duration: use 50% of file length so
+    # auto-find doesn't produce unexpectedly short output files.
+    if min_loop_duration is None:
+        min_loop_duration = max(1.0, total_duration * 0.5)
+        logger.debug(f"Auto min_loop_duration: {min_loop_duration:.1f}s")
 
     # Determine loop points
     if start_time is not None or end_time is not None:
@@ -611,8 +620,8 @@ Examples:
     parser.add_argument(
         "--min-loop",
         type=float,
-        default=1.0,
-        help="Minimum loop duration in seconds for auto-find (default: 1.0)",
+        default=None,
+        help="Minimum loop duration in seconds for auto-find (default: 50%% of file duration)",
     )
 
     parser.add_argument(
