@@ -21,7 +21,7 @@ class MockSound(BaseSound):
     - data mode: pass a numpy array for controlled audio output (mixer/layer tests)
     """
 
-    def __init__(self, filepath_or_data="test.ogg", config=None, loop=None, volume=1.0):
+    def __init__(self, filepath_or_data="test.ogg", config=None, loop=None, volume=1.0, on_start=None, on_end=None):
         if isinstance(filepath_or_data, np.ndarray):
             self._mock_data = filepath_or_data.copy()
             filepath = "mock_data"
@@ -29,7 +29,7 @@ class MockSound(BaseSound):
             self._mock_data = None
             filepath = filepath_or_data
 
-        super().__init__(filepath, loop, config=config, volume=volume)
+        super().__init__(filepath, loop, config=config, volume=volume, on_start=on_start, on_end=on_end)
         self.do_play_called = False
         self.do_pause_called = False
         self.do_stop_called = False

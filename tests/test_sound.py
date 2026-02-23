@@ -1,5 +1,7 @@
 """Tests for BaseSound class."""
 
+import threading
+
 import pytest
 
 from sound_player.core.mixins import STATUS
@@ -228,3 +230,119 @@ class TestBaseSoundWait:
 
         # Should have waited approximately 0.1 seconds
         assert 0.05 < elapsed < 0.3
+
+
+class TestBaseSoundLifecycleCallbacks:
+    """Tests for on_start and on_end lifecycle callbacks."""
+
+    def test_on_start_called_when_play(self):
+        calls = []
+        sound = MockSound("test.ogg", on_start=lambda: calls.append("start"))
+        sound.play()
+        assert calls == ["start"]
+
+    def test_on_start_not_called_before_play(self):
+        calls = []
+        MockSound("test.ogg", on_start=lambda: calls.append("start"))
+        assert calls == []
+
+    def test_on_start_fires_only_once(self):
+        calls = []
+        sound = MockSound("test.ogg", on_start=lambda: calls.append("start"))
+        sound.play()
+        sound.pause()
+        sound.play()
+        assert calls == ["start"]
+
+    def test_on_end_called_when_stop(self):
+        calls = []
+        sound = MockSound("test.ogg", on_end=lambda: calls.append("end"))
+        sound.play()
+        sound.stop()
+        assert calls == ["end"]
+
+    def test_on_end_not_called_without_prior_play(self):
+        calls = []
+        sound = MockSound("test.ogg", on_end=lambda: calls.append("end"))
+        sound.stop()
+        assert calls == []
+
+    def test_on_end_fires_only_once(self):
+        calls = []
+        sound = MockSound("test.ogg", on_end=lambda: calls.append("end"))
+        sound.play()
+        sound.stop()
+        sound._fire_on_end()
+        assert calls == ["end"]
+
+    def test_on_start_and_on_end_both_fire(self):
+        calls = []
+        sound = MockSound(
+            "test.ogg",
+            on_start=lambda: calls.append("start"),
+            on_end=lambda: calls.append("end"),
+        )
+        sound.play()
+        sound.stop()
+        assert calls == ["start", "end"]
+
+    def test_no_callbacks_is_fine(self):
+        sound = MockSound("test.ogg")
+        sound.play()
+        sound.stop()
+        assert sound.status().name == "STOPPED"
+
+    def test_fire_on_end_without_play_is_noop(self):
+        calls = []
+        sound = MockSound("test.ogg", on_end=lambda: calls.append("end"))
+        sound._fire_on_end()
+        assert calls == []
+
+    def test_on_end_not_fired_if_on_start_raised(self):
+        end_calls = []
+
+        def bad_on_start():
+            raise RuntimeError("on_start failed")
+
+        sound = MockSound("test.ogg", on_start=bad_on_start, on_end=lambda: end_calls.append("end"))
+        with pytest.raises(RuntimeError):
+            sound.play()
+        sound._fire_on_end()
+        assert end_calls == []
+
+    def test_on_start_thread_safe(self):
+        calls = []
+        sound = MockSound("test.ogg", on_start=lambda: calls.append("start"))
+        n = 20
+        barrier = threading.Barrier(n)
+
+        def try_fire():
+            barrier.wait()
+            sound._fire_on_start()
+
+        threads = [threading.Thread(target=try_fire) for _ in range(n)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert calls == ["start"]
+
+    def test_on_end_thread_safe(self):
+        calls = []
+        sound = MockSound("test.ogg", on_end=lambda: calls.append("end"))
+        sound.play()
+        n = 20
+        barrier = threading.Barrier(n)
+
+        def try_fire():
+            barrier.wait()
+            sound._fire_on_end()
+
+        threads = [threading.Thread(target=try_fire) for _ in range(n)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert calls == ["end"]
