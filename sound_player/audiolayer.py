@@ -272,6 +272,7 @@ class AudioLayer(StatusMixin, VolumeMixin, AudioConfigMixin):
                                 self._queue_current.pop(i)
                                 logger.debug("sound %s has stopped. Remove it", sound)
                                 self._mixer.remove_sound(sound)
+                                sound._fire_on_end()
                                 del sound
                             elif sound.fade_state == FadeState.FADING_OUT:
                                 self._queue_current.pop(i)
@@ -288,6 +289,7 @@ class AudioLayer(StatusMixin, VolumeMixin, AudioConfigMixin):
                                 self._fading_out_sounds.pop(i)
                                 logger.debug("Crossfade sound %s completed. Remove it", sound)
                                 self._mixer.remove_sound(sound)
+                                sound._fire_on_end()
                                 del sound
                             else:
                                 i += 1

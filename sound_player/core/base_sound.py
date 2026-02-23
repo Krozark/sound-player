@@ -22,7 +22,7 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin, ABC):
     audio playback control.
     """
 
-    def __init__(self, filepath, loop=None, *args, **kwargs):
+    def __init__(self, filepath, loop=None, *args, on_start=None, on_end=None, **kwargs):
         """Initialize the BaseSound.
 
         Args:
@@ -30,10 +30,16 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin, ABC):
             config: AudioConfig for audio format
             loop: Loop count (-1 for infinite, None for no loop)
             volume: Initial volume (0.0-1.0)
+            on_start: Optional callback invoked once when playback starts
+            on_end: Optional callback invoked once when playback ends
         """
         super().__init__(*args, **kwargs)
         self._filepath = filepath
         self._loop = loop
+        self._on_start = on_start
+        self._on_end = on_end
+        self._on_start_fired = False
+        self._on_end_fired = False
 
     def set_loop(self, loop):
         """Set the loop count.
@@ -44,6 +50,29 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin, ABC):
         logger.debug("BaseSound.set_loop(%s)", loop)
         with self._lock:
             self._loop = loop
+
+    def play(self, *args, **kwargs):
+        """Start playback and fire the on_start callback on first call."""
+        super().play(*args, **kwargs)
+        self._fire_on_start()
+
+    def stop(self, *args, **kwargs):
+        """Stop playback and fire the on_end callback if on_start had already fired."""
+        super().stop(*args, **kwargs)
+        self._fire_on_end()
+
+    def _fire_on_start(self):
+        """Invoke the on_start callback exactly once."""
+        if not self._on_start_fired:
+            self._on_start_fired = True
+            if self._on_start is not None:
+                self._on_start()
+
+    def _fire_on_end(self):
+        """Invoke the on_end callback exactly once, but only if on_start already fired."""
+        if self._on_end is not None and self._on_start_fired and not self._on_end_fired:
+            self._on_end_fired = True
+            self._on_end()
 
     def wait(self, timeout=None):
         """Wait for the sound to finish playing.
