@@ -1,5 +1,7 @@
 """Tests for BaseSound class."""
 
+import threading
+
 import pytest
 
 from sound_player.core.mixins import STATUS
@@ -309,8 +311,6 @@ class TestBaseSoundLifecycleCallbacks:
         assert end_calls == []
 
     def test_on_start_thread_safe(self):
-        import threading
-
         calls = []
         sound = MockSound("test.ogg", on_start=lambda: calls.append("start"))
         n = 20
@@ -329,8 +329,6 @@ class TestBaseSoundLifecycleCallbacks:
         assert calls == ["start"]
 
     def test_on_end_thread_safe(self):
-        import threading
-
         calls = []
         sound = MockSound("test.ogg", on_end=lambda: calls.append("end"))
         sound.play()
