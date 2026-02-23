@@ -307,3 +307,44 @@ class TestBaseSoundLifecycleCallbacks:
             sound.play()
         sound._fire_on_end()
         assert end_calls == []
+
+    def test_on_start_thread_safe(self):
+        import threading
+
+        calls = []
+        sound = MockSound("test.ogg", on_start=lambda: calls.append("start"))
+        n = 20
+        barrier = threading.Barrier(n)
+
+        def try_fire():
+            barrier.wait()
+            sound._fire_on_start()
+
+        threads = [threading.Thread(target=try_fire) for _ in range(n)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert calls == ["start"]
+
+    def test_on_end_thread_safe(self):
+        import threading
+
+        calls = []
+        sound = MockSound("test.ogg", on_end=lambda: calls.append("end"))
+        sound.play()
+        n = 20
+        barrier = threading.Barrier(n)
+
+        def try_fire():
+            barrier.wait()
+            sound._fire_on_end()
+
+        threads = [threading.Thread(target=try_fire) for _ in range(n)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert calls == ["end"]

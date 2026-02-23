@@ -62,17 +62,29 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin, ABC):
         self._fire_on_end()
 
     def _fire_on_start(self):
-        """Invoke the on_start callback exactly once."""
-        if not self._on_start_fired:
+        """Invoke the on_start callback exactly once.
+
+        The callback is called inside the lock so that a failed (raising)
+        on_start leaves _on_start_fired False, preventing on_end from firing.
+        """
+        with self._lock:
+            if self._on_start_fired:
+                return
             if self._on_start is not None:
                 self._on_start()
             self._on_start_fired = True
 
     def _fire_on_end(self):
-        """Invoke the on_end callback exactly once, but only if on_start already fired."""
-        if self._on_end is not None and self._on_start_fired and not self._on_end_fired:
+        """Invoke the on_end callback exactly once, but only if on_start already fired.
+
+        The flag is claimed inside the lock; the callback is invoked outside
+        so the lock is not held during user code.
+        """
+        with self._lock:
+            if self._on_end is None or not self._on_start_fired or self._on_end_fired:
+                return
             self._on_end_fired = True
-            self._on_end()
+        self._on_end()
 
     def wait(self, timeout=None):
         """Wait for the sound to finish playing.
