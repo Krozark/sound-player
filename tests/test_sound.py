@@ -295,3 +295,15 @@ class TestBaseSoundLifecycleCallbacks:
         sound = MockSound("test.ogg", on_end=lambda: calls.append("end"))
         sound._fire_on_end()
         assert calls == []
+
+    def test_on_end_not_fired_if_on_start_raised(self):
+        end_calls = []
+
+        def bad_on_start():
+            raise RuntimeError("on_start failed")
+
+        sound = MockSound("test.ogg", on_start=bad_on_start, on_end=lambda: end_calls.append("end"))
+        with pytest.raises(RuntimeError):
+            sound.play()
+        sound._fire_on_end()
+        assert end_calls == []

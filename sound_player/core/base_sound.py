@@ -64,9 +64,9 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin, ABC):
     def _fire_on_start(self):
         """Invoke the on_start callback exactly once."""
         if not self._on_start_fired:
-            self._on_start_fired = True
             if self._on_start is not None:
                 self._on_start()
+            self._on_start_fired = True
 
     def _fire_on_end(self):
         """Invoke the on_end callback exactly once, but only if on_start already fired."""
