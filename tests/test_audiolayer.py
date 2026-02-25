@@ -205,13 +205,17 @@ class TestAudioLayerPause:
         layer.pause()
         assert layer.status() == STATUS.PAUSED
 
-    def test_pause_pauses_current_sounds(self, mock_sound):
+    def test_pause_pauses_current_sounds(self):
         """Test that pause pauses all current sounds."""
         layer = AudioLayer()
-        sound1 = mock_sound()
-        sound2 = mock_sound()
+        layer.play()
+
+        # Create sounds with PLAYING status so the daemon thread doesn't remove them
+        # before pause() is called (mirrors the pattern in test_stop_stops_current_sounds)
+        sound1 = create_mock_sound(status=STATUS.PLAYING)
+        sound2 = create_mock_sound(status=STATUS.PLAYING)
         layer._queue_current.extend([sound1, sound2])
-        layer.play()  # Need to be playing to pause
+
         layer.pause()
         sound1.pause.assert_called_once()
         sound2.pause.assert_called_once()
