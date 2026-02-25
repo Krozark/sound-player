@@ -322,8 +322,8 @@ class AudioLayer(StatusMixin, VolumeMixin, AudioConfigMixin):
                                         self._mixer.remove_sound(sound)
 
                         # Add as many new as we can, respecting per-sound delay
+                        now = time.time()
                         while self._concurrency > len(self._queue_current) and self._queue_waiting:
-                            now = time.time()
                             ready_idx = None
                             for i, (_, enqueue_time, delay) in enumerate(self._queue_waiting):
                                 if delay is None or now - enqueue_time >= delay:
