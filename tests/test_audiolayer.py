@@ -84,7 +84,7 @@ class TestAudioLayerEnqueue:
         sound = mock_sound()
         layer.enqueue(sound)
         assert len(layer._queue_waiting) == 1
-        assert layer._queue_waiting[0] == sound
+        assert layer._queue_waiting[0][0] == sound
 
     def test_enqueue_preserves_sound_loop_when_layer_has_no_default(self, mock_sound):
         """Test that enqueue does not override sound loop when layer loop is None."""
@@ -381,5 +381,124 @@ class TestAudioLayerThreading:
         assert sound2 in layer._queue_current
 
         # Cleanup
+        layer.stop()
+        wait_for_thread_stop(layer)
+
+
+class TestAudioLayerDelay:
+    """Tests for per-sound delay in AudioLayer.enqueue."""
+
+    def test_enqueue_stores_delay(self, mock_sound):
+        """Test that enqueue stores the delay in the waiting queue tuple."""
+        layer = AudioLayer()
+        sound = mock_sound()
+        layer.enqueue(sound, delay=2.5)
+        assert len(layer._queue_waiting) == 1
+        stored_sound, _, stored_delay = layer._queue_waiting[0]
+        assert stored_sound is sound
+        assert stored_delay == 2.5
+
+    def test_enqueue_no_delay_stores_none(self, mock_sound):
+        """Test that enqueue without delay stores None."""
+        layer = AudioLayer()
+        sound = mock_sound()
+        layer.enqueue(sound)
+        _, _, stored_delay = layer._queue_waiting[0]
+        assert stored_delay is None
+
+    def test_sound_without_delay_starts_immediately(self, mock_sound, wait_for_thread_stop):
+        """Test that a sound with no delay starts as soon as a slot is available."""
+        layer = AudioLayer(concurrency=1)
+        sound = mock_sound(status=STATUS.PLAYING)
+        layer.enqueue(sound)
+        layer.play()
+
+        time.sleep(0.2)
+        assert sound in layer._queue_current
+
+        layer.stop()
+        wait_for_thread_stop(layer)
+
+    def test_sound_with_elapsed_delay_starts(self, mock_sound, wait_for_thread_stop):
+        """Test that a sound with an already-elapsed delay starts immediately."""
+        layer = AudioLayer(concurrency=1)
+        sound = mock_sound(status=STATUS.PLAYING)
+        layer.enqueue(sound, delay=0.0)
+        layer.play()
+
+        time.sleep(0.2)
+        assert sound in layer._queue_current
+
+        layer.stop()
+        wait_for_thread_stop(layer)
+
+    def test_sound_with_future_delay_is_skipped(self, mock_sound, wait_for_thread_stop):
+        """Test that a sound with a large delay is not started before the delay elapses."""
+        layer = AudioLayer(concurrency=1)
+        sound = mock_sound(status=STATUS.PLAYING)
+        layer.enqueue(sound, delay=60.0)  # 60 seconds — will never elapse in test
+        layer.play()
+
+        time.sleep(0.3)
+        assert sound not in layer._queue_current
+        assert len(layer._queue_waiting) == 1
+
+        layer.stop()
+        wait_for_thread_stop(layer)
+
+    def test_later_sound_plays_while_earlier_is_delayed(self, mock_sound, wait_for_thread_stop):
+        """Test that a sound enqueued after a delayed sound can start if the slot is free."""
+        layer = AudioLayer(concurrency=1)
+        sound1 = mock_sound(status=STATUS.PLAYING)  # long delay — never ready
+        sound2 = mock_sound(status=STATUS.PLAYING)  # no delay — ready immediately
+
+        layer.enqueue(sound1, delay=60.0)
+        layer.enqueue(sound2)
+        layer.play()
+
+        time.sleep(0.3)
+
+        # sound1 must still be waiting (delay not elapsed)
+        assert sound1 not in layer._queue_current
+        # sound2 should have started despite being enqueued after sound1
+        assert sound2 in layer._queue_current
+
+        layer.stop()
+        wait_for_thread_stop(layer)
+
+    def test_delayed_sound_starts_after_delay_elapses(self, mock_sound, wait_for_thread_stop):
+        """Test that a delayed sound starts once its delay has elapsed."""
+        layer = AudioLayer(concurrency=1)
+        sound = mock_sound(status=STATUS.PLAYING)
+        layer.enqueue(sound, delay=0.25)
+        layer.play()
+
+        # Not yet started — delay hasn't elapsed
+        time.sleep(0.1)
+        assert sound not in layer._queue_current
+
+        # After delay has elapsed the thread should promote it
+        time.sleep(0.4)
+        assert sound in layer._queue_current
+
+        layer.stop()
+        wait_for_thread_stop(layer)
+
+    def test_fifo_order_among_ready_sounds(self, mock_sound, wait_for_thread_stop):
+        """Test that ready sounds are still promoted in FIFO order."""
+        layer = AudioLayer(concurrency=1)
+        sound1 = mock_sound(status=STATUS.PLAYING)
+        sound2 = mock_sound(status=STATUS.PLAYING)
+
+        layer.enqueue(sound1)  # both ready immediately
+        layer.enqueue(sound2)
+        layer.play()
+
+        time.sleep(0.2)
+
+        # First sound enqueued should be the one currently playing
+        assert sound1 in layer._queue_current
+        assert sound2 not in layer._queue_current
+
         layer.stop()
         wait_for_thread_stop(layer)

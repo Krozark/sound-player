@@ -148,7 +148,7 @@ class AudioLayer(StatusMixin, VolumeMixin, AudioConfigMixin):
         with self._lock:
             self._fade_out_duration = duration
 
-    def enqueue(self, sound, fade_in=None, fade_out=None):
+    def enqueue(self, sound, fade_in=None, fade_out=None, delay: float | None = None):
         """Add a sound to the waiting queue.
 
         Layer defaults override sound properties only when explicitly set (not None).
@@ -158,11 +158,11 @@ class AudioLayer(StatusMixin, VolumeMixin, AudioConfigMixin):
             sound: The sound to enqueue
             fade_in: Override fade-in duration (None to use layer default)
             fade_out: Override fade-out duration (None to use layer default)
+            delay: Minimum time in seconds the sound must wait before it can start playing.
+                   None (default) means no delay — the sound starts as soon as a slot is free.
         """
-        logger.debug("AudioLayer.enqueue(%s)", sound)
+        logger.debug("AudioLayer.enqueue(%s, delay=%s)", sound, delay)
         with self._lock:
-            logger.debug("enqueue %s" % sound)
-
             # Apply layer defaults only when explicitly set (not None)
             if self._loop is not None:
                 sound.set_loop(self._loop)
@@ -181,7 +181,7 @@ class AudioLayer(StatusMixin, VolumeMixin, AudioConfigMixin):
             if fade_out is not None:
                 sound.set_fade_out_duration(fade_out)
 
-            self._queue_waiting.append(sound)
+            self._queue_waiting.append((sound, time.time(), delay))
 
     def clear(self):
         """Clear all queues and the mixer."""
@@ -321,9 +321,18 @@ class AudioLayer(StatusMixin, VolumeMixin, AudioConfigMixin):
                                         sound.stop()
                                         self._mixer.remove_sound(sound)
 
-                        # Add as many new as we can
-                        while self._concurrency > len(self._queue_current) and len(self._queue_waiting):
-                            sound = self._queue_waiting.popleft()
+                        # Add as many new as we can, respecting per-sound delay
+                        now = time.time()
+                        while self._concurrency > len(self._queue_current) and self._queue_waiting:
+                            ready_idx = None
+                            for i, (_, enqueue_time, delay) in enumerate(self._queue_waiting):
+                                if delay is None or now - enqueue_time >= delay:
+                                    ready_idx = i
+                                    break
+                            if ready_idx is None:
+                                break
+                            sound, _, _ = self._queue_waiting[ready_idx]
+                            del self._queue_waiting[ready_idx]
                             logger.debug("Adding sound %s", sound)
                             sound.play()
                             self._queue_current.append(sound)
