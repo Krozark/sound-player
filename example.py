@@ -13,7 +13,7 @@ import argparse
 import logging
 import time
 
-from sound_player import Sound, SoundPlayer
+from sound_player import RandomRepeatSound, Sound, SoundPlayer
 from sound_player.core import AudioConfig, FadeCurve
 
 
@@ -422,6 +422,27 @@ def test_play_fade():
     player.wait()
 
 
+def test_play_random_sounds():
+    print("\n" + "=" * 50)
+    print("Test 11: Play Random Sounds")
+    print("=" * 50)
+
+    player = SoundPlayer()
+
+    layer = player.create_audio_layer(
+        "ambience",
+        concurrency=1,
+        replace=False,
+        volume=1,
+    )
+
+    layer.enqueue(
+        RandomRepeatSound(filepaths=["data/coin.wav", "data/coin.wav"], layer=layer, min_wait=1, max_wait=3, loop=3)
+    )
+    player.play()
+    player.wait()
+
+
 def main(verbosity: int = 0):
     """Run all examples.
 
@@ -440,11 +461,12 @@ def main(verbosity: int = 0):
     # test_audio_layer_replace_mode()
     # test_sound_player_multiple_layers()
     # test_volume_controls()
-    test_loop_functionality()
+    # test_loop_functionality()
     # test_audio_configuration()
     # test_manual_fade()
     # test_crossfade()
-    # test_play_fade()
+    test_play_fade()
+    # test_play_random_sounds()
 
     print("\n" + "=" * 50)
     print("All examples completed!")
