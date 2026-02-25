@@ -66,7 +66,7 @@ class BaseSoundPlayer(StatusMixin, VolumeMixin, AudioConfigMixin, ABC):
             self._audio_layers[layer] = new_layer
             return new_layer
 
-    def enqueue(self, sound, layer):
+    def enqueue(self, sound, layer, **kwargs):
         """Add a sound to a specific audio layer.
 
         Args:
@@ -84,7 +84,7 @@ class BaseSoundPlayer(StatusMixin, VolumeMixin, AudioConfigMixin, ABC):
                     self._audio_layers[layer].play()
                 elif self._status == STATUS.PAUSED:
                     self._audio_layers[layer].pause()
-            self._audio_layers[layer].enqueue(sound)
+            self._audio_layers[layer].enqueue(sound, **kwargs)
 
     def status(self, layer=None):
         """Get the status of a layer or the player.
