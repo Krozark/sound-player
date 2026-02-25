@@ -64,24 +64,25 @@ class RandomRepeatSound(Sound):
         self._final_on_end = on_end
 
         # Pass on_end=None so BaseSound stores None; we override it below.
-        super().__init__(filepath=random.choice(filepaths), on_end=None, **kwargs)
+        super().__init__(filepath=random.choice(filepaths), on_end=self._check_for_another_sound, **kwargs)
 
-    def _on_end(self) -> None:
+    def _check_for_another_sound(self) -> None:
         """Invoked by the audio layer when the current file finishes playing."""
-        if self._repeat_remaining > 0:
+        repeat_remaining = self._repeat_remaining - 1
+
+        if repeat_remaining <= 0:
             logger.debug("RandomRepeatSound: all repeats exhausted on layer %s", self._layer)
             if self._final_on_end is not None:
                 self._final_on_end()
             return
 
-        next_remaining = self._repeat_remaining - 1
         wait = random.uniform(self._min_wait, self._max_wait)
-        logger.debug("RandomRepeatSound: scheduling next file in %.2fs (repeats left: %s)", wait, next_remaining)
+        logger.debug("RandomRepeatSound: scheduling next file in %.2fs (repeats left: %s)", wait, repeat_remaining)
 
         next_sound = RandomRepeatSound(
             filepaths=self._filepaths,
             layer=self._layer,
-            repeat=next_remaining,
+            loop=repeat_remaining,
             min_wait=self._min_wait,
             max_wait=self._max_wait,
             on_end=self._final_on_end,

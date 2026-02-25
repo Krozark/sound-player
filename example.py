@@ -437,7 +437,18 @@ def test_play_random_sounds():
     )
 
     layer.enqueue(
-        RandomRepeatSound(filepaths=["data/coin.wav", "data/coin.wav"], layer=layer, min_wait=1, max_wait=3, loop=3)
+        RandomRepeatSound(
+            filepaths=[
+                "data/bird.mp3",
+                "data/cat.mp3",
+                "data/cow.mp3",
+                "data/elephant.mp3",
+            ],
+            layer=layer,
+            min_wait=1,
+            max_wait=3,
+            loop=5,
+        )
     )
     player.play()
     player.wait()
@@ -465,8 +476,8 @@ def main(verbosity: int = 0):
     # test_audio_configuration()
     # test_manual_fade()
     # test_crossfade()
-    test_play_fade()
-    # test_play_random_sounds()
+    # test_play_fade()
+    test_play_random_sounds()
 
     print("\n" + "=" * 50)
     print("All examples completed!")

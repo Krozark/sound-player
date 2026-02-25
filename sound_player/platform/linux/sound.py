@@ -139,6 +139,15 @@ class LinuxPCMSound(BaseSound):
             if self._file_is_float:
                 logger.debug(f"File is float format, will convert to {config.dtype}")
 
+            # Warm up the decoder: some formats (OGG/Vorbis, FLAC, MP3, etc.)
+            # are slow to decode on the first read due to decoder initialization.
+            # Reading a small chunk here (in the daemon thread) ensures the decoder
+            # is ready before the audio callback first calls _do_get_next_chunk().
+            warmup = min(config.buffer_size, self._file_info.frames)
+            self._sound_file.read(warmup, dtype=self._file_dtype)
+            self._sound_file.seek(0)
+            self._position = 0
+
     def _do_pause(self, *args, **kwargs):
         """Pause playback."""
         logger.debug("LinuxPCMSound._do_pause()")

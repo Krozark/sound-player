@@ -56,6 +56,7 @@ class LinuxSoundPlayer(BaseSoundPlayer):
             channels=config.channels,
             dtype=config.dtype,
             blocksize=config.buffer_size,
+            latency="high",
             callback=self._audio_callback,
         )
 
