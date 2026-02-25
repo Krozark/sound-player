@@ -58,34 +58,27 @@ class RandomRepeatSound(Sound):
     ):
         self._filepaths = filepaths
         self._layer = layer
-        self._repeat_remaining = 0 if loop is None else loop
+        # None = infinite, 0 = play once (0 additional), N = N additional plays
+        self._repeat_remaining = loop
         self._min_wait = min_wait
         self._max_wait = max_wait
         self._final_on_end = on_end
 
-        # Pass on_end=None so BaseSound stores None; we override it below.
         super().__init__(filepath=random.choice(filepaths), on_end=self._check_for_another_sound, **kwargs)
 
     def _check_for_another_sound(self) -> None:
         """Invoked by the audio layer when the current file finishes playing."""
-        repeat_remaining = self._repeat_remaining - 1
+        if self._repeat_remaining is not None:
+            self._repeat_remaining -= 1
+            if self._repeat_remaining < 0:
+                logger.debug("RandomRepeatSound: all repeats exhausted on layer %s", self._layer)
+                if self._final_on_end is not None:
+                    self._final_on_end()
+                return
 
-        if repeat_remaining <= 0:
-            logger.debug("RandomRepeatSound: all repeats exhausted on layer %s", self._layer)
-            if self._final_on_end is not None:
-                self._final_on_end()
-            return
-
+        self._load_filepath(random.choice(self._filepaths))
         wait = random.uniform(self._min_wait, self._max_wait)
-        logger.debug("RandomRepeatSound: scheduling next file in %.2fs (repeats left: %s)", wait, repeat_remaining)
-
-        next_sound = RandomRepeatSound(
-            filepaths=self._filepaths,
-            layer=self._layer,
-            loop=repeat_remaining,
-            min_wait=self._min_wait,
-            max_wait=self._max_wait,
-            on_end=self._final_on_end,
-            on_start=None,  # on_start intentionally omitted: only the initial sounds fire it
+        logger.debug(
+            "RandomRepeatSound: scheduling next file in %.2fs (repeats left: %s)", wait, self._repeat_remaining
         )
-        self._layer.enqueue(next_sound, delay=wait)
+        self._layer.enqueue(self, delay=wait)

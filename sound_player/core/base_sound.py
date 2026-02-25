@@ -34,12 +34,42 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin, ABC):
             on_end: Optional callback invoked once when playback ends
         """
         super().__init__(*args, **kwargs)
+
         self._filepath = filepath
         self._loop = loop
         self._on_start = on_start
         self._on_end = on_end
         self._on_start_fired = False
         self._on_end_fired = False
+
+        # Loop tracking
+        self._loop_count = 0
+
+        # Load file info and conversion caches
+        self._load_filepath(self._filepath)
+
+    def _check_loop(self) -> bool:
+        """Check if we should loop and update loop counter.
+
+        Returns:
+            True if looping should continue, False otherwise
+        """
+        self._loop_count += 1
+
+        if self._loop == -1:
+            # Infinite loop
+            return True
+        # Return True if we should continue looping
+        return self._loop is not None and self._loop_count < self._loop
+
+    def _load_filepath(self, filepath: str) -> None:
+        """Switch to a different source file. Must be called only when stopped."""
+        self._filepath = filepath
+        with self._lock:
+            self._on_start_fired = False
+            self._on_end_fired = False
+            self._loop_count = 0
+        self._do_load_filepath(filepath)
 
     def set_loop(self, loop):
         """Set the loop count.
@@ -61,31 +91,6 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin, ABC):
         super().stop(*args, **kwargs)
         self._fire_on_end()
 
-    def _fire_on_start(self):
-        """Invoke the on_start callback exactly once.
-
-        The callback is called inside the lock so that a failed (raising)
-        on_start leaves _on_start_fired False, preventing on_end from firing.
-        """
-        with self._lock:
-            if self._on_start_fired:
-                return
-            if self._on_start is not None:
-                self._on_start()
-            self._on_start_fired = True
-
-    def _fire_on_end(self):
-        """Invoke the on_end callback exactly once, but only if on_start already fired.
-
-        The flag is claimed inside the lock; the callback is invoked outside
-        so the lock is not held during user code.
-        """
-        with self._lock:
-            if self._on_end is None or not self._on_start_fired or self._on_end_fired:
-                return
-            self._on_end_fired = True
-        self._on_end()
-
     def wait(self, timeout=None):
         """Wait for the sound to finish playing.
 
@@ -96,15 +101,6 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin, ABC):
         start_time = time.time()
         while self._status != STATUS.STOPPED and (timeout is None or time.time() - start_time < timeout):
             time.sleep(0.1)
-
-    def _get_remaining_samples(self) -> int | None:
-        """Return the number of output samples remaining until end of the last loop.
-
-        Returns None if unknown (e.g. infinite loop, or platform doesn't support it).
-        Called with the lock held. Subclasses should override this to enable
-        automatic fade-out support.
-        """
-        return None
 
     def get_next_chunk(self, size: int) -> np.ndarray | None:
         """Return next audio chunk as numpy array.
@@ -149,21 +145,6 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin, ABC):
 
             return chunk
 
-    def _do_get_next_chunk(self, size: int) -> np.ndarray | None:
-        """Get the next chunk of audio data.
-
-        Subclasses must implement this method to provide the actual
-        audio data. This method is called with the lock held.
-
-        Args:
-            size: Number of samples to return
-
-        Returns:
-            Audio data as numpy array with shape (size, channels)
-            Returns None if sound has ended
-        """
-        raise NotImplementedError(f"{self.__class__.__name__} does not implement _do_get_next_chunk()")
-
     def get_sample_rate(self) -> int:
         """Return the audio sample rate.
 
@@ -190,6 +171,56 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin, ABC):
         with self._lock:
             self._do_seek(position)
 
+    def _get_remaining_samples(self) -> int | None:
+        """Return the number of output samples remaining until end of the last loop.
+
+        Returns None if unknown (e.g. infinite loop, or platform doesn't support it).
+        Called with the lock held. Subclasses should override this to enable
+        automatic fade-out support.
+        """
+        return None
+
+    def _fire_on_start(self):
+        """Invoke the on_start callback exactly once.
+
+        The callback is called inside the lock so that a failed (raising)
+        on_start leaves _on_start_fired False, preventing on_end from firing.
+        """
+        with self._lock:
+            if self._on_start_fired:
+                return
+            if self._on_start is not None:
+                self._on_start()
+            self._on_start_fired = True
+
+    def _fire_on_end(self):
+        """Invoke the on_end callback exactly once, but only if on_start already fired.
+
+        The flag is claimed inside the lock; the callback is invoked outside
+        so the lock is not held during user code.
+        """
+        with self._lock:
+            if self._on_end is None or not self._on_start_fired or self._on_end_fired:
+                return
+            self._on_end_fired = True
+        self._on_end()
+
+    @abstractmethod
+    def _do_get_next_chunk(self, size: int) -> np.ndarray | None:
+        """Get the next chunk of audio data.
+
+        Subclasses must implement this method to provide the actual
+        audio data. This method is called with the lock held.
+
+        Args:
+            size: Number of samples to return
+
+        Returns:
+            Audio data as numpy array with shape (size, channels)
+            Returns None if sound has ended
+        """
+        raise NotImplementedError(f"{self.__class__.__name__} does not implement _do_get_next_chunk()")
+
     @abstractmethod
     def _do_seek(self, position: float) -> None:
         """Hook for subclasses to implement seeking.
@@ -200,3 +231,7 @@ class BaseSound(StatusMixin, AudioConfigMixin, FadeMixin, ABC):
             position: Position in seconds
         """
         raise NotImplementedError()
+
+    def _do_load_filepath(self, filepath: str) -> None:
+        """Hook for subclasses to update platform-specific file info caches."""
+        pass

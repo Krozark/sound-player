@@ -45,20 +45,9 @@ class LinuxPCMSound(BaseSound):
             loop: Number of times to loop (-1 for infinite)
             volume: Volume level (0-100)
         """
-        super().__init__(*args, **kwargs)
-
-        # Audio file info
-        self._file_info = sf.info(self._filepath)
-        self._file_sample_rate = self._file_info.samplerate
-        self._file_channels = self._file_info.channels
-
-        # Check if file is in float format (which has conversion issues in soundfile)
-        self._file_is_float = self._file_info.subtype in ("FLOAT", "DOUBLE", "VORBIS", "OPUS", "MP3", "FLAC")
-
         # Playback state
         self._sound_file: sf.SoundFile | None = None
         self._position = 0  # Current position in samples
-        self._loop_count = 0
 
         # Resampling buffers
         self._resample_buffer: np.ndarray | None = None
@@ -67,16 +56,23 @@ class LinuxPCMSound(BaseSound):
         # File's native dtype for reading
         self._file_dtype = None
 
-        # Cache whether conversion is needed (avoids recalculating every chunk)
+        super().__init__(*args, **kwargs)
+
+        # Cache dtype flag (depends only on config, set after super initialises AudioConfigMixin)
+        self._is_int16 = self.config.dtype == np.int16
+
+    def _do_load_filepath(self, filepath: str) -> None:
+        """Update file-info caches when switching to a new source file."""
+        self._file_info = sf.info(filepath)
+        self._file_sample_rate = self._file_info.samplerate
+        self._file_channels = self._file_info.channels
+        self._file_is_float = self._file_info.subtype in ("FLOAT", "DOUBLE", "VORBIS", "OPUS", "MP3", "FLAC")
         config = self.config
         self._needs_conversion = self._file_sample_rate != config.sample_rate or self._file_channels != config.channels
-
-        # Cache whether float-to-int conversion is needed for _safe_read
         self._needs_float_conversion = self._file_is_float and config.dtype in (
             np.dtype(np.int16),
             np.dtype(np.int32),
         )
-        self._is_int16 = config.dtype == np.int16
 
     def _get_file_dtype(self) -> str:
         """Get the file's native dtype for safe reading.
@@ -349,20 +345,6 @@ class LinuxPCMSound(BaseSound):
         if self._file_sample_rate != self.config.sample_rate:
             return int(remaining_file_samples * self.config.sample_rate / self._file_sample_rate)
         return remaining_file_samples
-
-    def _check_loop(self) -> bool:
-        """Check if we should loop and update loop counter.
-
-        Returns:
-            True if looping should continue, False otherwise
-        """
-        self._loop_count += 1
-
-        if self._loop == -1:
-            # Infinite loop
-            return True
-        # Return True if we should continue looping
-        return self._loop is not None and self._loop_count < self._loop
 
     def _do_seek(self, position: float) -> None:
         """Seek to position in seconds.

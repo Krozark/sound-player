@@ -48,8 +48,6 @@ class AndroidPCMSound(BaseSound):
 
     def __init__(self, *args, **kwargs):
         """Initialize the AndroidPCMSound."""
-        super().__init__(*args, **kwargs)
-
         # MediaExtractor and MediaCodec
         self._extractor = None
         self._codec = None
@@ -63,9 +61,6 @@ class AndroidPCMSound(BaseSound):
         self._file_sample_rate = 44100
         self._file_channels = 2
 
-        # Loop tracking
-        self._loop_count = 0
-
         # Total output frames for one full pass (set from durationUs in track format)
         self._total_output_frames: int = 0
         # Output frames consumed in the current pass
@@ -75,7 +70,7 @@ class AndroidPCMSound(BaseSound):
         self._decode_thread = None
         self._stop_decoding = threading.Event()
 
-        logger.debug(f"AndroidPCMSound initialized: {self._filepath}")
+        super().__init__(*args, **kwargs)
 
     def _do_play(self, *args, **kwargs):
         """Start or resume playback."""
@@ -375,13 +370,6 @@ class AndroidPCMSound(BaseSound):
 
         remaining = self._total_output_frames - self._frames_consumed
         return max(0, remaining)
-
-    def _check_loop(self) -> bool:
-        """Increment the loop counter and return True if playback should loop."""
-        self._loop_count += 1
-        if self._loop == -1:
-            return True
-        return self._loop is not None and self._loop_count < self._loop
 
     def _do_seek(self, position: float) -> None:
         """Seek to a position in seconds.
